@@ -392,8 +392,13 @@ IPDL_SOURCES += [
     "PClipboardWriteRequest.ipdl",
 ]
 
-LOCAL_INCLUDES += [
-    "/widget/%s" % toolkit,
+if toolkit == "gtk":
+    LOCAL_INCLUDES += [
+        "/widget/gtk%s" % CONFIG["MOZ_GTK_VERSION"],
+    ]
+else:
+    LOCAL_INCLUDES += [
+        "/widget/%s" % toolkit,
 ]
 
 if CONFIG["ENABLE_TESTS"]:
