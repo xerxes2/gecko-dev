@@ -122,7 +122,7 @@ if CONFIG["MOZ_WIDGET_TOOLKIT"] == "gtk":
     ]
     LOCAL_INCLUDES += [
         "/widget",
-        "/widget/gtk",
+        "/widget/gtk%s" % CONFIG["MOZ_GTK_VERSION"],
     ]
 
 if CONFIG["MOZ_X11"]:
