@@ -564,6 +564,7 @@ def toolkit_choices(target):
             "cairo-gtk3-x11-wayland",
             "cairo-gtk3-wayland-only",
             "cairo-gtk3-x11-only",
+            "cairo-gtk4",
         )
 
 
@@ -589,7 +590,7 @@ def full_toolkit(value):
 
 @depends(full_toolkit)
 def toolkit(toolkit):
-    if toolkit.startswith("cairo-gtk3"):
+    if toolkit.startswith("cairo-gtk"):
         widget_toolkit = "gtk"
     else:
         widget_toolkit = toolkit.replace("cairo-", "")
@@ -613,14 +614,24 @@ def toolkit_gtk(toolkit):
     return toolkit == "gtk"
 
 
-@depends(toolkit_gtk, full_toolkit)
+@depends(full_toolkit)
+def toolkit_gtk3(toolkit):
+    return toolkit.startswith("cairo-gtk3")
+
+
+@depends(full_toolkit)
+def toolkit_gtk4(toolkit):
+    return toolkit.startswith("cairo-gtk4")
+
+
+@depends(toolkit_gtk3, full_toolkit)
 def toolkit_gtk_x11(toolkit_gtk, full_toolkit):
     return toolkit_gtk and full_toolkit != "cairo-gtk3-wayland-only"
 
 
-@depends(full_toolkit)
-def toolkit_gtk_x11_optional(full_toolkit):
-    return full_toolkit == "cairo-gtk3-wayland"
+@depends(toolkit_gtk3, full_toolkit)
+def toolkit_gtk_x11_optional(toolkit_gtk, full_toolkit):
+    return toolkit_gtk and full_toolkit == "cairo-gtk3-wayland"
 
 
 @depends(toolkit_gtk, full_toolkit)
@@ -635,26 +646,36 @@ def toolkit_gtk_wayland_optional(full_toolkit):
 
 # Wayland support
 # ==============================================================
-wayland_headers = pkg_check_modules(
-    "MOZ_WAYLAND",
-    "gtk+-wayland-3.0 >= 3.14 xkbcommon >= 0.4.1",
-    allow_missing=toolkit_gtk_wayland_optional,
-    when=toolkit_gtk_wayland,
-)
+with only_when(toolkit_gtk3):
+    wayland_headers_3 = pkg_check_modules(
+        "MOZ_WAYLAND",
+        "gtk+-wayland-3.0 >= 3.14 xkbcommon >= 0.4.1",
+        allow_missing=toolkit_gtk_wayland_optional,
+        when=toolkit_gtk_wayland,
+    )
+
+with only_when(toolkit_gtk4):
+    wayland_headers_4 = pkg_check_modules(
+        "MOZ_WAYLAND",
+        "gtk4-wayland >= 4.0 xkbcommon >= 0.4.1",
+        allow_missing=toolkit_gtk_wayland_optional,
+        when=toolkit_gtk_wayland,
+    )
 
 
-@depends(wayland_headers, toolkit_gtk, artifact_builds, toolkit_gtk_wayland)
-def wayland_headers(wayland, toolkit_gtk, artifacts, toolkit_gtk_wayland):
+@depends(wayland_headers_3, wayland_headers_4, toolkit_gtk, toolkit_gtk3, artifact_builds, toolkit_gtk_wayland)
+def wayland_headers(wayland_3, wayland_4, toolkit_gtk, toolkit_gtk3, artifacts, toolkit_gtk_wayland):
     if not toolkit_gtk_wayland:
         return False
     if toolkit_gtk and artifacts:
         return True
-    return wayland
+    if toolkit_gtk3:
+        return wayland_3
+    return wayland_4
 
 
 set_config("MOZ_WAYLAND", depends_if(wayland_headers)(lambda _: True))
 set_define("MOZ_WAYLAND", depends_if(wayland_headers)(lambda _: True))
-
 
 # Hardware-accelerated video decode with VAAPI and V4L2 on Linux
 # ==============================================================
@@ -847,21 +868,15 @@ def av1(value):
         return True
 
 
-option("--with-system-av1", help="Use system av1 (located with pkg-config)")
-
-pkg_check_modules("MOZ_SYSTEM_LIBAOM", "aom >= 3.0.0", when="--with-system-av1")
-pkg_check_modules("MOZ_SYSTEM_LIBDAV1D", "dav1d >= 1.2.1", when="--with-system-av1")
-
-
-@depends(target, "--with-system-av1", when=av1 & compile_environment)
-def dav1d_asm(target, system_av1):
-    if not system_av1 and target.cpu in ("arm", "aarch64", "x86", "x86_64"):
+@depends(target, when=av1 & compile_environment)
+def dav1d_asm(target):
+    if target.cpu in ("arm", "aarch64", "x86", "x86_64"):
         return True
 
 
-@depends(target, "--with-system-av1", when=av1 & compile_environment)
-def dav1d_nasm(target, system_av1):
-    if not system_av1 and target.cpu in ("x86", "x86_64"):
+@depends(target, when=av1 & compile_environment)
+def dav1d_nasm(target):
+    if target.cpu in ("x86", "x86_64"):
         return namespace(version="2.14", what="AV1")
 
 
@@ -869,7 +884,6 @@ set_config("MOZ_DAV1D_ASM", dav1d_asm)
 set_define("MOZ_DAV1D_ASM", dav1d_asm)
 set_config("MOZ_AV1", av1)
 set_define("MOZ_AV1", av1)
-set_config("MOZ_SYSTEM_AV1", True, when="--with-system-av1")
 
 # JXL Image Codec Support
 # ==============================================================
@@ -2687,11 +2701,7 @@ set_config("NASM_ASFLAGS", nasm_asflags)
 with only_when(compile_environment & target_is_windows):
     set_config("MOZ_ANGLE_RENDERER", True)
 
-    option(
-        "--enable-dxcompiler",
-        default=milestone.is_nightly,
-        help="{Enable|Disable} DXC for WebGPU on Windows",
-    )
+    option("--enable-dxcompiler", help="{Enable|Disable} DXC for WebGPU on Windows")
 
     @depends("--enable-dxcompiler", target, valid_windows_sdk_dir)
     @checking("for dxcompiler.dll and dxil.dll")
@@ -3317,7 +3327,7 @@ set_define("MOZ_DATA_REPORTING", True, when=data_reporting)
 
 # Gtk+
 # ==============================================================
-with only_when(toolkit_gtk):
+with only_when(toolkit_gtk3):
     pkg_check_modules(
         "MOZ_GTK3",
         "gtk+-3.0 >= 3.14.0 gtk+-unix-print-3.0 glib-2.0 gobject-2.0 gio-unix-2.0",
@@ -3332,6 +3342,28 @@ with only_when(toolkit_gtk):
     set_define("GLIB_VERSION_MAX_ALLOWED", "GLIB_VERSION_2_42")
 
     set_define("MOZ_ACCESSIBILITY_ATK", True, when=accessibility)
+    set_config("MOZ_GTK3", True)
+    set_define("MOZ_GTK3", True)
+    set_config("MOZ_GTK_VERSION", "")
+
+with only_when(toolkit_gtk4):
+    pkg_check_modules(
+        "MOZ_GTK3",
+        "gtk4 >= 4.14.0 gtk4-unix-print glib-2.0 gobject-2.0 gio-unix-2.0",
+    )
+
+    set_define("GDK_VERSION_MIN_REQUIRED", "GDK_VERSION_4_10")
+    set_define("GDK_VERSION_MAX_ALLOWED", "GDK_VERSION_4_10")
+
+    pkg_check_modules("GLIB", "glib-2.0 >= 2.42 gobject-2.0")
+
+    set_define("GLIB_VERSION_MIN_REQUIRED", "GLIB_VERSION_2_42")
+    set_define("GLIB_VERSION_MAX_ALLOWED", "GLIB_VERSION_2_42")
+
+    set_define("MOZ_ACCESSIBILITY_ATK", False)
+    set_config("MOZ_GTK4", True)
+    set_define("MOZ_GTK4", True)
+    set_config("MOZ_GTK_VERSION", "4")
 
 # DBus
 # ==============================================================
