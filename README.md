@@ -1,5 +1,11 @@
 # Unofficial Firefox GTK4 port
 
+## Download
+The smallest download you can do is cloning with depth 1 (around 840 MB):
+```
+$ git clone --depth 1 https://github.com/xerxes2/gecko-dev.git
+```
+
 ## Build
 ```
 $ cp mozconfig.proto mozconfig
