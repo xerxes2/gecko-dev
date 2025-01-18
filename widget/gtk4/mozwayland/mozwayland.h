@@ -14,7 +14,7 @@
 
 #include "mozilla/Types.h"
 #include <gtk/gtk.h>
-#include <gdk/gdkwayland.h>
+#include <gdk/wayland/gdkwayland.h>
 
 #ifdef __cplusplus
 extern "C" {
