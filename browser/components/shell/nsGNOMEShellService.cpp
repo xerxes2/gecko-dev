@@ -456,14 +456,23 @@ nsGNOMEShellService::GetDesktopBackgroundColor(uint32_t* aColor) {
     *aColor = 0;
     return NS_OK;
   }
-
+  #ifdef MOZ_GTK4
+  GdkRGBA color;
+  gboolean success = gdk_rgba_parse(&color, background.get());
+  #else
   GdkColor color;
   gboolean success = gdk_color_parse(background.get(), &color);
+  #endif
 
   NS_ENSURE_TRUE(success, NS_ERROR_FAILURE);
 
+  #ifdef MOZ_GTK4
+  *aColor = COLOR_16_TO_8_BIT((int)color.red * 65535) << 16 |
+            COLOR_16_TO_8_BIT((int)color.green * 65535) << 8 | COLOR_16_TO_8_BIT((int)color.blue * 65535);
+  #else
   *aColor = COLOR_16_TO_8_BIT(color.red) << 16 |
             COLOR_16_TO_8_BIT(color.green) << 8 | COLOR_16_TO_8_BIT(color.blue);
+  #endif
   return NS_OK;
 }
 
