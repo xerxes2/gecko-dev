@@ -49,7 +49,9 @@
 #  include "mozilla/layers/TextureD3D11.h"
 #endif
 #ifdef MOZ_WIDGET_GTK
+   #ifndef MOZ_GTK4
 #  include <gtk/gtkx.h>
+   #endif
 #  include "gfxPlatformGtk.h"
 #  include "mozilla/layers/DMABUFTextureClientOGL.h"
 #  include "mozilla/widget/DMABufLibWrapper.h"
