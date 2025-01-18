@@ -14,7 +14,7 @@
 typedef struct _GdkDisplay GdkDisplay;
 typedef struct _GdkDevice GdkDevice;
 typedef struct _GError GError;
-typedef union _GdkEvent GdkEvent;
+typedef struct _GdkEvent GdkEvent;
 class nsWindow;
 
 namespace mozilla::widget {
