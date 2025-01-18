@@ -227,7 +227,7 @@ class WaylandSurface final {
   // we need to commit the wl_surface regularly as Gdk registers frame callback
   // for it at on_frame_clock_after_paint() event of GdkWindow.
   bool AddOpaqueSurfaceHandlerLocked(const WaylandSurfaceLock& aProofOfLock,
-                                     GdkWindow* aGdkWindow,
+                                     GdkSurface* aGdkWindow,
                                      bool aRegisterCommitHandler);
   bool RemoveOpaqueSurfaceHandlerLocked(const WaylandSurfaceLock& aProofOfLock);
 
@@ -242,7 +242,7 @@ class WaylandSurface final {
     mFrameCallbackForceCommit = true;
   }
 
-  GdkWindow* GetGdkWindow() const;
+  GdkSurface* GetGdkWindow() const;
 
   static bool IsOpaqueRegionEnabled();
 
@@ -304,7 +304,7 @@ class WaylandSurface final {
   gfx::IntSize mSizeScaled;
 
   // Parent GdkWindow where we paint to, directly or via subsurface.
-  RefPtr<GdkWindow> mGdkWindow;
+  RefPtr<GdkSurface> mGdkWindow;
 
   // Parent wl_surface owned by mGdkWindow. It's used when we're attached
   // directly to MozContainer.
@@ -393,9 +393,9 @@ class WaylandSurface final {
   mozilla::Atomic<bool, mozilla::Relaxed> mIsOpaqueSurfaceHandlerSet{false};
   gulong mGdkAfterPaintId = 0;
   static bool sIsOpaqueRegionEnabled;
-  static void (*sGdkWaylandWindowAddCallbackSurface)(GdkWindow*,
+  static void (*sGdkWaylandWindowAddCallbackSurface)(GdkSurface*,
                                                      struct wl_surface*);
-  static void (*sGdkWaylandWindowRemoveCallbackSurface)(GdkWindow*,
+  static void (*sGdkWaylandWindowRemoveCallbackSurface)(GdkSurface*,
                                                         struct wl_surface*);
   guint mEmulatedFrameCallbackTimerID = 0;
   constexpr static int sEmulatedFrameCallbackTimeoutMs = (int)(1000.0 / 60.0);
