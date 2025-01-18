@@ -720,9 +720,17 @@ void ContentChild::Init(mozilla::ipc::UntypedEndpoint&& aEndpoint,
           // XRE_InitChildProcess().
           nullptr, option_name, const_cast<char*>(display_name), nullptr};
       char** argvp = argv;
+      #ifdef MOZ_GTK4
+      gtk_init();
+      #else
       gtk_init(&argc, &argvp);
+      #endif
     } else {
+      #ifdef MOZ_GTK4
+      gtk_init();
+      #else
       gtk_init(nullptr, nullptr);
+      #endif
     }
   }
 #endif
