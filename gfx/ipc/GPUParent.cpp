@@ -368,9 +368,17 @@ mozilla::ipc::IPCResult GPUParent::RecvInit(
                     // XRE_InitChildProcess().
                     nullptr, option_name, display_name, nullptr};
     char** argvp = argv;
+    #ifdef MOZ_GTK4
+    gtk_init();
+    #else
     gtk_init(&argc, &argvp);
+    #endif
   } else {
+    #ifdef MOZ_GTK4
+    gtk_init();
+    #else
     gtk_init(nullptr, nullptr);
+    #endif
   }
 
   // Ensure we have an FT library for font instantiation.
