@@ -78,7 +78,11 @@
 #if defined(MOZ_WIDGET_GTK)
 #  include "mozilla/widget/GtkCompositorWidget.h"
 #  if defined(MOZ_WAYLAND)
-#    include <gdk/gdkwayland.h>
+     #ifdef MOZ_GTK4
+#    include <gdk/wayland/gdkwayland.h>
+     #else
+     #include <gdk/gdkwayland.h>
+     #endif
 #    include <wayland-egl.h>
 #    include "mozilla/WidgetUtilsGtk.h"
 #    include "mozilla/widget/nsWaylandDisplay.h"
