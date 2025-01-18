@@ -2952,9 +2952,12 @@ bool gfxFcPlatformFontList::UpdateSystemFontOptions() {
     }
   }
 #  endif  // MOZ_X11
-
+  #ifdef MOZ_GTK4
+  const cairo_font_options_t* options = cairo_font_options_create();
+  #else
   const cairo_font_options_t* options =
       gdk_screen_get_font_options(gdk_screen_get_default());
+  #endif
   if (!options) {
     bool changed = !!mSystemFontOptions;
     ClearSystemFontOptions();
