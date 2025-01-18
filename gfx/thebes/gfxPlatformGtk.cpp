@@ -64,7 +64,11 @@
 #endif /* MOZ_X11 */
 
 #ifdef MOZ_WAYLAND
+   #ifdef MOZ_GTK4
+#  include <gdk/wayland/gdkwayland.h>
+   #else
 #  include <gdk/gdkwayland.h>
+   #endif
 #  include "mozilla/widget/nsWaylandDisplay.h"
 #endif
 #ifdef MOZ_WIDGET_GTK
