@@ -110,8 +110,12 @@ static bool IsX11EGLEnvvarEnabled() {
 
 gfxPlatformGtk::gfxPlatformGtk() {
   if (!gfxPlatform::IsHeadless()) {
+    #ifdef MOZ_GTK4
+    if (!gtk_init_check()) {
+    #else
     if (!gtk_init_check(nullptr, nullptr)) {
-      gfxCriticalNote << "Failed to init Gtk, missing display? DISPLAY="
+    #endif
+    gfxCriticalNote << "Failed to init Gtk, missing display? DISPLAY="
                       << getenv("DISPLAY")
                       << " WAYLAND_DISPLAY=" << getenv("WAYLAND_DISPLAY")
                       << "\n";
