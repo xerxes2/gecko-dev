@@ -89,8 +89,13 @@ using namespace mozilla::widget;
 static FT_Library gPlatformFTLibrary = nullptr;
 static int32_t sDPI;
 
+#ifdef MOZ_GTK4
+static void screen_resolution_changed(GdkMonitor* aMon, GParamSpec* aPspec,
+                                      gpointer aClosure) {
+#else
 static void screen_resolution_changed(GdkScreen* aScreen, GParamSpec* aPspec,
                                       gpointer aClosure) {
+#endif
   sDPI = 0;
 }
 
@@ -132,12 +137,23 @@ gfxPlatformGtk::gfxPlatformGtk() {
   MOZ_RELEASE_ASSERT(gPlatformFTLibrary);
   Factory::SetFTLibrary(gPlatformFTLibrary);
 
+  #ifdef MOZ_GTK4
+  GdkDisplay* display = gdk_display_get_default();
+  if (display) {  
+    GListModel* monitors = gdk_display_get_monitors(display);
+    void* monitor = g_list_model_get_item(monitors, 0);
+    if (monitor) {
+      g_signal_connect(monitor, "notify::geometry",
+                     G_CALLBACK(screen_resolution_changed), nullptr);
+    }
+  }
+  #else
   GdkScreen* gdkScreen = gdk_screen_get_default();
   if (gdkScreen) {
     g_signal_connect(gdkScreen, "notify::resolution",
                      G_CALLBACK(screen_resolution_changed), nullptr);
   }
-
+  #endif
   // Bug 1714483: Force disable FXAA Antialiasing on NV drivers. This is a
   // temporary workaround for a driver bug.
   PR_SetEnv("__GL_ALLOW_FXAA_USAGE=0");
@@ -378,9 +394,14 @@ already_AddRefed<gfxASurface> gfxPlatformGtk::CreateOffscreenSurface(
   // XXX we really need a different interface here, something that passes
   // in more context, including the display and/or target surface type that
   // we should try to match
+  #ifdef MOZ_GTK4
+  GdkDisplay* gdkDisplay = gdk_display_get_default();
+  if (gdkDisplay) {
+  #else
   GdkScreen* gdkScreen = gdk_screen_get_default();
   if (gdkScreen) {
-    newSurface = new gfxImageSurface(aSize, aFormat);
+  #endif
+  newSurface = new gfxImageSurface(aSize, aFormat);
     // The gfxImageSurface ctor zeroes this for us, no need to
     // waste time clearing again
     needsClear = false;
@@ -470,6 +491,21 @@ int32_t gfxPlatformGtk::GetFontScaleDPI() {
   if (MOZ_LIKELY(sDPI != 0)) {
     return sDPI;
   }
+  #ifdef MOZ_GTK4
+  int32_t dpi = 96;
+  GdkDisplay* display = gdk_display_get_default();
+  if (display) {
+    gtk_settings_get_default();
+    GListModel* monitors = gdk_display_get_monitors(display);
+    void* monitor = g_list_model_get_item(monitors, 0);
+    GdkRectangle geometry;
+    gdk_monitor_get_geometry(GDK_MONITOR(monitor), &geometry);
+    dpi = (geometry.width / (gdk_monitor_get_width_mm(GDK_MONITOR(monitor)) / 25));
+    if (dpi <= 0) {
+      dpi = 96;
+    }
+  }
+  #else
   GdkScreen* screen = gdk_screen_get_default();
   // Ensure settings in config files are processed.
   gtk_settings_get_for_screen(screen);
@@ -478,6 +514,7 @@ int32_t gfxPlatformGtk::GetFontScaleDPI() {
     // Fall back to something reasonable
     dpi = 96;
   }
+  #endif
   sDPI = dpi;
   return dpi;
 }
@@ -490,11 +527,12 @@ double gfxPlatformGtk::GetFontScaleFactor() {
 
 gfxImageFormat gfxPlatformGtk::GetOffscreenFormat() {
   // Make sure there is a screen
+  #ifndef MOZ_GTK4
   GdkScreen* screen = gdk_screen_get_default();
   if (screen && gdk_visual_get_depth(gdk_visual_get_system()) == 16) {
     return SurfaceFormat::R5G6B5_UINT16;
   }
-
+  #endif
   return SurfaceFormat::X8R8G8B8_UINT32;
 }
 
