@@ -138,8 +138,9 @@ MessagePumpForUI::MessagePumpForUI()
 }
 
 MessagePumpForUI::~MessagePumpForUI() {
-  gdk_event_handler_set(reinterpret_cast<GdkEventFunc>(gtk_main_do_event), this,
-                        NULL);
+ // Have no clue how to replace this. FIX ME
+ // gdk_event_handler_set(reinterpret_cast<GdkEventFunc>(gtk_main_do_event), this,
+ //                       NULL);
   g_source_destroy(work_source_);
   g_source_unref(work_source_);
   close(wakeup_pipe_read_);
