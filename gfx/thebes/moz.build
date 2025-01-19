@@ -137,6 +137,9 @@ elif CONFIG["MOZ_WIDGET_TOOLKIT"] == "gtk":
         "gfxPlatformGtk.cpp",
         "PrintTargetPDF.cpp",
     ]
+    LOCAL_INCLUDES += [
+        "/widget/gtk%s" % CONFIG["MOZ_GTK_VERSION"],
+    ]
 
     if CONFIG["MOZ_X11"]:
         EXPORTS += [
@@ -279,7 +282,6 @@ LOCAL_INCLUDES += [
     "/dom/xml",
     "/gfx/cairo/cairo/src",
     "/third_party/xsimd/include",
-    "/widget/gtk",
 ]
 
 if CONFIG["MOZ_WIDGET_TOOLKIT"] in ("android", "gtk"):
