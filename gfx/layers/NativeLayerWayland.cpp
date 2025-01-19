@@ -77,11 +77,20 @@ NativeLayerRootWayland::NativeLayerRootWayland(MozContainer* aContainer)
 }
 
 NativeLayerRootWayland::~NativeLayerRootWayland() {
+  #ifdef MOZ_GTK4
+  GtkNative* gtkNative = gtk_widget_get_native(GTK_WIDGET(mContainer));
+  GdkSurface* gdkSurface = gtk_native_get_surface(gtkNative);
+  if (gdkSurface) {
+    GdkFrameClock* frameClock = gdk_surface_get_frame_clock(gdkSurface);
+    g_signal_handlers_disconnect_by_data(frameClock, this);
+  }
+  #else
   GdkWindow* gdkWindow = gtk_widget_get_window(GTK_WIDGET(mContainer));
   if (gdkWindow) {
     GdkFrameClock* frameClock = gdk_window_get_frame_clock(gdkWindow);
     g_signal_handlers_disconnect_by_data(frameClock, this);
   }
+  #endif
   g_object_unref(mContainer);
 }
 
