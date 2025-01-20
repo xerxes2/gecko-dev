@@ -46,8 +46,11 @@ bool nsDBusRemoteServer::HandleOpenURL(const gchar* aInterfaceName,
     g_warning("nsDBusRemoteServer: HandleOpenURL() called with wrong params!");
     return false;
   }
-
+  #ifdef MOZ_GTK4
+  HandleCommandLine(aParam, GDK_CURRENT_TIME);
+  #else
   HandleCommandLine(aParam, gtk_get_current_event_time());
+  #endif
   return true;
 }
 
