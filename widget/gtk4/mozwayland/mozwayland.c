@@ -8,7 +8,7 @@
 #include <stdlib.h>
 #include "mozilla/Types.h"
 #include <gtk/gtk.h>
-#include <gtk/gtkx.h>
+//#include <gtk/gtkx.h>
 #include <gdk/gdkwayland.h>
 #include <xkbcommon/xkbcommon.h>
 
