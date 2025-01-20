@@ -25,7 +25,7 @@
 
 #include <stdlib.h>
 #include <stdint.h>
-#include <gdk/gdkwayland.h>
+#include <gdk/wayland/gdkwayland.h>
 #include "wayland-util.h"
 
 #ifndef __has_attribute
