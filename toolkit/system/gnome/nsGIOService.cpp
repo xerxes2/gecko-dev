@@ -96,6 +96,11 @@ nsFlatpakHandlerApp::LaunchWithURI(
   // why the gtk_show_uri fails there.
   // The workaround is to set TMPDIR environment variable in sandbox to
   // $XDG_CACHE_HOME/tmp before executing Firefox.
+  #ifdef MOZ_GTK4
+  GtkUriLauncher* launcher = gtk_uri_launcher_new(spec.get());
+  gtk_uri_launcher_launch(launcher, nullptr, nullptr, nullptr, nullptr);
+  g_object_unref(launcher);
+  #else
   gtk_show_uri(nullptr, spec.get(), GDK_CURRENT_TIME, getter_Transfers(error));
   if (error) {
     NS_WARNING(
@@ -103,6 +108,7 @@ nsFlatpakHandlerApp::LaunchWithURI(
             .get());
     return NS_ERROR_FAILURE;
   }
+  #endif
   return NS_OK;
 }
 
