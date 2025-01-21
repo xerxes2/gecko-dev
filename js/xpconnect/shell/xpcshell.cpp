@@ -43,7 +43,9 @@ int main(int argc, char** argv, char** envp) {
   // A default display may or may not be required for xpcshell tests, and so
   // is not created here. Instead we set the command line args, which is a
   // fairly cheap operation.
+  #ifndef MOZ_GTK4
   gtk_parse_args(&argc, &argv);
+  #endif
 #endif
 
 #ifdef XP_MACOSX
