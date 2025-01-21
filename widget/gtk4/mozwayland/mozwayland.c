@@ -216,8 +216,8 @@ MOZ_EXPORT struct wl_compositor* gdk_wayland_display_get_wl_compositor(
     GdkDisplay* display) {
   return NULL;
 }
-MOZ_EXPORT struct wl_surface* gdk_wayland_window_get_wl_surface(
-    GdkWindow* window) {
+MOZ_EXPORT struct wl_surface* gdk_wayland_surface_get_wl_surface(
+    GdkSurface* surface) {
   return NULL;
 }
 
