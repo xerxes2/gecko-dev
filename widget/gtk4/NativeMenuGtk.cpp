@@ -5,7 +5,7 @@
 
 #include "NativeMenuGtk.h"
 #include "AsyncDBus.h"
-#include "gdk/gdkkeysyms-compat.h"
+//#include "gdk/gdkkeysyms-compat.h"
 #include "mozilla/BasicEvents.h"
 #include "mozilla/dom/Document.h"
 #include "mozilla/dom/DocumentInlines.h"
