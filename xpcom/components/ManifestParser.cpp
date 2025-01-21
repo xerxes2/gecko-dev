@@ -466,8 +466,13 @@ void ParseManifest(NSLocationType aType, FileLocation& aFile, char* aBuf,
   SInt32 minorVersion = nsCocoaFeatures::macOSVersionMinor();
   nsTextFormatter::ssprintf(osVersion, u"%ld.%ld", majorVersion, minorVersion);
 #elif defined(MOZ_WIDGET_GTK)
+  #ifdef MOZ_GTK4
+  nsTextFormatter::ssprintf(osVersion, u"%ld.%ld", GTK_MAJOR_VERSION,
+                            GTK_MINOR_VERSION);
+  #else
   nsTextFormatter::ssprintf(osVersion, u"%ld.%ld", gtk_major_version,
                             gtk_minor_version);
+  #endif
 #elif defined(MOZ_WIDGET_ANDROID)
   bool isTablet = false;
   if (jni::IsAvailable()) {
