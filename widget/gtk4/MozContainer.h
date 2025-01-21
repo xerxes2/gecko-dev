@@ -46,7 +46,7 @@ typedef struct _MozContainer MozContainer;
 typedef struct _MozContainerClass MozContainerClass;
 
 struct _MozContainer {
-  GtkContainer container;
+  GtkBox container;
   gboolean destroyed;
 #ifdef MOZ_WAYLAND
   MozContainerWayland* wl;
@@ -54,7 +54,7 @@ struct _MozContainer {
 };
 
 struct _MozContainerClass {
-  GtkContainerClass parent_class;
+  GtkBoxClass parent_class;
 };
 
 namespace mozilla::widget {
