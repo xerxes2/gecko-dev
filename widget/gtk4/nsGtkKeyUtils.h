@@ -17,7 +17,7 @@
 #  include <X11/XKBlib.h>
 #endif
 #ifdef MOZ_WAYLAND
-#  include <gdk/gdkwayland.h>
+#  include <gdk/wayland/gdkwayland.h>
 #  include <xkbcommon/xkbcommon.h>
 #endif
 #include "X11UndefineNone.h"
