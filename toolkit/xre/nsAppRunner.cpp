@@ -340,7 +340,11 @@ MOZ_CONSTINIT nsString gProcessStartupShortcut;
 #  include "mozilla/WidgetUtilsGtk.h"
 #  include <gtk/gtk.h>
 #  ifdef MOZ_WAYLAND
-#    include <gdk/gdkwayland.h>
+     #ifdef MOZ_GTK4
+     #include <gdk/wayland/gdkwayland.h>
+     #else
+     #include <gdk/gdkwayland.h>
+     #endif
 #    include "mozilla/widget/nsWaylandDisplay.h"
 #    include "wayland-proxy.h"
 #  endif
