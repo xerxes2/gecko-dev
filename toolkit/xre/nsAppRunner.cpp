@@ -4722,7 +4722,11 @@ int XREMain::XRE_mainStartup(bool* aExitFlag) {
   // Open the display ourselves instead of using gtk_init, so that we can
   // close it without fear that one day gtk might clean up the display it
   // opens.
+  #ifdef MOZ_GTK4
+  if (!gtk_init_check()) return 1;
+  #else
   if (!gtk_parse_args(&gArgc, &gArgv)) return 1;
+  #endif
 #endif /* MOZ_WIDGET_GTK */
 
 #ifdef FUZZING
