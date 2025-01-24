@@ -40,7 +40,7 @@
 #  include "X11UndefineNone.h"
 #endif
 #ifdef MOZ_WAYLAND
-#  include <gdk/gdkwayland.h>
+#  include <gdk/wayland/gdkwayland.h>
 #  include "base/thread.h"
 #  include "nsClipboardWayland.h"
 #endif
