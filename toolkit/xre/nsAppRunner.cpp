@@ -4779,8 +4779,14 @@ int XREMain::XRE_mainStartup(bool* aExitFlag) {
     bool saveDisplayArg = false;
 
     // display_name is owned by gdk.
+    #ifdef MOZ_GTK4
+    GdkDisplay* display = gdk_display_get_default();
+    display_name = gdk_display_get_name(display);
+    #else
     display_name = gdk_get_display_arg_name();
+    #endif
     bool waylandEnabled = IsWaylandEnabled();
+
 #  ifdef MOZ_WAYLAND
     if (!display_name) {
       auto* proxyEnv = getenv("MOZ_DISABLE_WAYLAND_PROXY");
