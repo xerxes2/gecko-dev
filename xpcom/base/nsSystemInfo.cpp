@@ -1503,8 +1503,13 @@ nsresult nsSystemInfo::Init() {
   ssize_t gtkver_len = 0;
 
   if (gtkver_len <= 0) {
+    #ifdef MOZ_GTK4
+    gtkver_len = SprintfLiteral(gtkver, "GTK %u.%u.%u", GTK_MAJOR_VERSION,
+                                GTK_MINOR_VERSION, GTK_MICRO_VERSION);
+    #else
     gtkver_len = SprintfLiteral(gtkver, "GTK %u.%u.%u", gtk_major_version,
                                 gtk_minor_version, gtk_micro_version);
+    #endif
   }
 
   nsAutoCString secondaryLibrary;
