@@ -106,7 +106,7 @@ class IMContextWrapper final : public TextEventDispatcherListener {
    *                                      this class doesn't dispatch
    *                                      keyboard event anymore.
    */
-  KeyHandlingState OnKeyEvent(nsWindow* aWindow, GdkEventKey* aEvent,
+  KeyHandlingState OnKeyEvent(nsWindow* aWindow, GdkKeyEvent* aEvent,
                               bool aKeyboardEventWasDispatched = false);
 
   // IME related nsIWidget methods.
@@ -232,7 +232,7 @@ class IMContextWrapper final : public TextEventDispatcherListener {
 
   // OnKeyEvent() temporarily sets mProcessingKeyEvent to the given native
   // event.
-  GdkEventKey* mProcessingKeyEvent;
+  GdkKeyEvent* mProcessingKeyEvent;
 
   /**
    * GdkEventKeyQueue stores *copy* of GdkEventKey instances.  However, this
@@ -248,18 +248,19 @@ class IMContextWrapper final : public TextEventDispatcherListener {
     /**
      * PutEvent() puts new event into the queue.
      */
-    void PutEvent(const GdkEventKey* aEvent) {
-      GdkEventKey* newEvent = reinterpret_cast<GdkEventKey*>(
-          gdk_event_copy(reinterpret_cast<const GdkEvent*>(aEvent)));
-      newEvent->state &= GDK_MODIFIER_MASK;
-      mEvents.AppendElement(newEvent);
+    void PutEvent(GdkKeyEvent* aEvent) {
+     // GdkKeyEvent* newEvent = reinterpret_cast<GdkKeyEvent*>(
+      //    gdk_event_copy(reinterpret_cast<const GdkEvent*>(aEvent)));
+      //newEvent->state &= GDK_MODIFIER_MASK;
+      //mEvents.AppendElement(newEvent);
+      mEvents.AppendElement(aEvent);
     }
 
     /**
      * RemoveEvent() removes oldest same event and its preceding events
      * from the queue.
      */
-    void RemoveEvent(const GdkEventKey* aEvent) {
+    void RemoveEvent(GdkKeyEvent* aEvent) {
       size_t index = IndexOf(aEvent);
       if (NS_WARN_IF(index == GdkEventKeyQueue::NoIndex())) {
         return;
@@ -271,13 +272,17 @@ class IMContextWrapper final : public TextEventDispatcherListener {
      * Return corresponding GDK_KEY_PRESS event for aEvent.  aEvent must be a
      * GDK_KEY_RELEASE event.
      */
-    const GdkEventKey* GetCorrespondingKeyPressEvent(
-        const GdkEventKey* aEvent) const {
-      MOZ_ASSERT(aEvent->type == GDK_KEY_RELEASE);
-      for (const GUniquePtr<GdkEventKey>& pendingKeyEvent : mEvents) {
-        if (pendingKeyEvent->type == GDK_KEY_PRESS &&
-            aEvent->hardware_keycode == pendingKeyEvent->hardware_keycode) {
-          return pendingKeyEvent.get();
+    const GdkKeyEvent* GetCorrespondingKeyPressEvent(
+         GdkKeyEvent* aEvent) const {
+      //MOZ_ASSERT(aEvent->type == GDK_KEY_RELEASE);
+      MOZ_ASSERT(gdk_event_get_event_type(GDK_EVENT(aEvent)) == GDK_KEY_RELEASE);
+      //for (const GUniquePtr<GdkKeyEvent>& pendingKeyEvent : mEvents) {
+      for (GdkKeyEvent* pendingKeyEvent : mEvents) {
+      //if (pendingKeyEvent->type == GDK_KEY_PRESS &&
+        if (gdk_event_get_event_type(GDK_EVENT(pendingKeyEvent)) == GDK_KEY_PRESS &&
+          //aEvent->hardware_keycode == pendingKeyEvent->hardware_keycode) {
+            gdk_key_event_get_keycode(GDK_EVENT(aEvent)) == gdk_key_event_get_keycode(GDK_EVENT(pendingKeyEvent))) {
+          return pendingKeyEvent;
         }
       }
       return nullptr;
@@ -286,31 +291,31 @@ class IMContextWrapper final : public TextEventDispatcherListener {
     /**
      * FirstEvent() returns oldest event in the queue.
      */
-    GdkEventKey* GetFirstEvent() const {
+    GdkKeyEvent* GetFirstEvent() const {
       if (mEvents.IsEmpty()) {
         return nullptr;
       }
-      return mEvents[0].get();
+      return mEvents[0];
     }
 
     bool IsEmpty() const { return mEvents.IsEmpty(); }
 
-    static size_t NoIndex() { return nsTArray<GdkEventKey*>::NoIndex; }
+    static size_t NoIndex() { return nsTArray<GdkKeyEvent*>::NoIndex; }
     size_t Length() const { return mEvents.Length(); }
-    size_t IndexOf(const GdkEventKey* aEvent) const {
+    size_t IndexOf(GdkKeyEvent* aEvent) const {
       static_assert(!(GDK_MODIFIER_MASK & (1 << 24)),
                     "We assumes 25th bit is used by some IM, but used by GDK");
       static_assert(!(GDK_MODIFIER_MASK & (1 << 25)),
                     "We assumes 26th bit is used by some IM, but used by GDK");
       for (size_t i = 0; i < mEvents.Length(); i++) {
-        GdkEventKey* event = mEvents[i].get();
+        GdkKeyEvent* event = mEvents[i];
         // It must be enough to compare only type, time, keyval and
         // part of state.   Note that we cannot compaire two events
         // simply since IME may have changed unused bits of state.
-        if (event->time == aEvent->time) {
-          if (NS_WARN_IF(event->type != aEvent->type) ||
-              NS_WARN_IF(event->keyval != aEvent->keyval) ||
-              NS_WARN_IF(event->state != (aEvent->state & GDK_MODIFIER_MASK))) {
+        if (gdk_event_get_time(GDK_EVENT(event)) == gdk_event_get_time(GDK_EVENT(aEvent))) {
+          if (NS_WARN_IF(gdk_event_get_event_type(GDK_EVENT(event)) != gdk_event_get_event_type(GDK_EVENT(aEvent))) ||
+              NS_WARN_IF(gdk_key_event_get_keyval(GDK_EVENT(event)) != gdk_key_event_get_keyval(GDK_EVENT(aEvent))) ||
+              NS_WARN_IF(gdk_event_get_modifier_state(GDK_EVENT(event)) != (gdk_event_get_modifier_state(GDK_EVENT(aEvent)) & GDK_MODIFIER_MASK))) {
             continue;
           }
         }
@@ -320,7 +325,7 @@ class IMContextWrapper final : public TextEventDispatcherListener {
     }
 
    private:
-    nsTArray<GUniquePtr<GdkEventKey>> mEvents;
+    nsTArray<GdkKeyEvent*> mEvents;
   };
   // OnKeyEvent() append mPostingKeyEvents when it believes that a key event
   // is posted to other IME process.
