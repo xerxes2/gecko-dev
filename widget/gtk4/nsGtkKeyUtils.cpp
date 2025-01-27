@@ -13,7 +13,7 @@
 #include <algorithm>
 #include <gdk/gdk.h>
 #include <dlfcn.h>
-#include <gdk/gdkkeysyms-compat.h>
+//#include <gdk/gdkkeysyms-compat.h>
 #ifdef MOZ_X11
 #  include <gdk/gdkx.h>
 #  include <X11/XKBlib.h>
@@ -253,35 +253,35 @@ const char* KeymapWrapper::GetModifierName(MappedModifier aModifier) {
 KeymapWrapper::MappedModifier KeymapWrapper::GetModifierForGDKKeyval(
     guint aGdkKeyval) {
   switch (aGdkKeyval) {
-    case GDK_Caps_Lock:
+    case GDK_KEY_Caps_Lock:
       return CAPS_LOCK;
-    case GDK_Num_Lock:
+    case GDK_KEY_Num_Lock:
       return NUM_LOCK;
-    case GDK_Scroll_Lock:
+    case GDK_KEY_Scroll_Lock:
       return SCROLL_LOCK;
-    case GDK_Shift_Lock:
-    case GDK_Shift_L:
-    case GDK_Shift_R:
+    case GDK_KEY_Shift_Lock:
+    case GDK_KEY_Shift_L:
+    case GDK_KEY_Shift_R:
       return SHIFT;
-    case GDK_Control_L:
-    case GDK_Control_R:
+    case GDK_KEY_Control_L:
+    case GDK_KEY_Control_R:
       return CTRL;
-    case GDK_Alt_L:
-    case GDK_Alt_R:
+    case GDK_KEY_Alt_L:
+    case GDK_KEY_Alt_R:
       return ALT;
-    case GDK_Super_L:
-    case GDK_Super_R:
+    case GDK_KEY_Super_L:
+    case GDK_KEY_Super_R:
       return SUPER;
-    case GDK_Hyper_L:
-    case GDK_Hyper_R:
+    case GDK_KEY_Hyper_L:
+    case GDK_KEY_Hyper_R:
       return HYPER;
-    case GDK_Meta_L:
-    case GDK_Meta_R:
+    case GDK_KEY_Meta_L:
+    case GDK_KEY_Meta_R:
       return META;
-    case GDK_ISO_Level3_Shift:
-    case GDK_Mode_switch:
+    case GDK_KEY_ISO_Level3_Shift:
+    case GDK_KEY_Mode_switch:
       return LEVEL3;
-    case GDK_ISO_Level5_Shift:
+    case GDK_KEY_ISO_Level5_Shift:
       return LEVEL5;
     default:
       return NOT_MODIFIER;
@@ -355,14 +355,14 @@ void KeymapWrapper::Shutdown() {
 
 KeymapWrapper::KeymapWrapper()
     : mInitialized(false),
-      mGdkKeymap(gdk_keymap_get_default()),
+      mGdkKeymap(gdk_seat_get_keyboard(gdk_display_get_default_seat(gdk_display_get_default()))),
       mXKBBaseEventCode(0),
       mOnKeysChangedSignalHandle(0),
       mOnDirectionChangedSignalHandle(0) {
-  MOZ_LOG(gKeyLog, LogLevel::Info,
-          ("%p Constructor, mGdkKeymap=%p", this, mGdkKeymap));
+  //MOZ_LOG(gKeyLog, LogLevel::Info,
+  //        ("%p Constructor, mGdkKeymap=%p", this, mGdkKeymap));
 
-  g_object_ref(mGdkKeymap);
+  //g_object_ref(mGdkKeymap);
 
 #ifdef MOZ_X11
   if (GdkIsX11Display()) {
@@ -377,8 +377,8 @@ void KeymapWrapper::Init() {
   }
   mInitialized = true;
 
-  MOZ_LOG(gKeyLog, LogLevel::Info,
-          ("%p Init, mGdkKeymap=%p", this, mGdkKeymap));
+  //MOZ_LOG(gKeyLog, LogLevel::Info,
+  //        ("%p Init, mGdkKeymap=%p", this, mGdkKeymap));
 
   mModifierKeys.Clear();
   memset(mModifierMasks, 0, sizeof(mModifierMasks));
@@ -733,12 +733,12 @@ KeymapWrapper::~KeymapWrapper() {
   gdk_window_remove_filter(nullptr, FilterEvents, this);
 #endif
   if (mOnKeysChangedSignalHandle) {
-    g_signal_handler_disconnect(mGdkKeymap, mOnKeysChangedSignalHandle);
+   // g_signal_handler_disconnect(mGdkKeymap, mOnKeysChangedSignalHandle);
   }
   if (mOnDirectionChangedSignalHandle) {
-    g_signal_handler_disconnect(mGdkKeymap, mOnDirectionChangedSignalHandle);
+   // g_signal_handler_disconnect(mGdkKeymap, mOnDirectionChangedSignalHandle);
   }
-  g_object_unref(mGdkKeymap);
+ // g_object_unref(mGdkKeymap);
   MOZ_LOG(gKeyLog, LogLevel::Info, ("%p Destructor", this));
 }
 
@@ -876,7 +876,7 @@ void KeymapWrapper::ResetKeyboard() {
 }
 
 /* static */
-void KeymapWrapper::OnKeysChanged(GdkKeymap* aGdkKeymap,
+void KeymapWrapper::OnKeysChanged(GdkDevice* aGdkKeymap,
                                   KeymapWrapper* aKeymapWrapper) {
   MOZ_LOG(gKeyLog, LogLevel::Info,
           ("OnKeysChanged, aGdkKeymap=%p, aKeymapWrapper=%p", aGdkKeymap,
@@ -891,7 +891,7 @@ void KeymapWrapper::OnKeysChanged(GdkKeymap* aGdkKeymap,
 }
 
 // static
-void KeymapWrapper::OnDirectionChanged(GdkKeymap* aGdkKeymap,
+void KeymapWrapper::OnDirectionChanged(GdkDevice* aGdkKeymap,
                                        KeymapWrapper* aKeymapWrapper) {
   // XXX
   // A lot of diretion-changed signal might be fired on switching bidi
@@ -912,10 +912,12 @@ void KeymapWrapper::OnDirectionChanged(GdkKeymap* aGdkKeymap,
 guint KeymapWrapper::GetCurrentModifierState() {
   GdkModifierType modifiers;
   GdkDisplay* display = gdk_display_get_default();
-  GdkScreen* screen = gdk_display_get_default_screen(display);
-  GdkWindow* window = gdk_screen_get_root_window(screen);
-  gdk_window_get_device_position(window, GdkGetPointer(), nullptr, nullptr,
-                                 &modifiers);
+  GdkSeat* seat = gdk_display_get_default_seat(display);
+  GdkDevice* keyboard = gdk_seat_get_keyboard(seat);
+  modifiers = gdk_device_get_modifier_state(keyboard);
+  //mGdkKeymap(gdk_display_get_default_seat(gdk_display_get_default())))
+  //gdk_window_get_device_position(window, GdkGetPointer(), nullptr, nullptr,
+  //                               &modifiers);
   return static_cast<guint>(modifiers);
 }
 
@@ -1093,10 +1095,11 @@ void KeymapWrapper::InitInputEvent(WidgetInputEvent& aInputEvent,
 }
 
 /* static */
-uint32_t KeymapWrapper::ComputeDOMKeyCode(const GdkEventKey* aGdkKeyEvent) {
+uint32_t KeymapWrapper::ComputeDOMKeyCode(GdkKeyEvent* aGdkKeyEvent) {
   // If the keyval indicates it's a modifier key, we should use unshifted
   // key's modifier keyval.
-  guint keyval = aGdkKeyEvent->keyval;
+  //guint keyval = aGdkKeyEvent->keyval;
+  guint keyval = gdk_key_event_get_keyval(GDK_EVENT(aGdkKeyEvent));
   if (GetModifierForGDKKeyval(keyval)) {
     // But if the keyval without modifiers isn't a modifier key, we
     // shouldn't use it.  E.g., Japanese keyboard layout's
@@ -1152,37 +1155,37 @@ uint32_t KeymapWrapper::ComputeDOMKeyCode(const GdkEventKey* aGdkKeyEvent) {
 
   // printable numpad keys should be resolved here.
   switch (keyval) {
-    case GDK_KP_Multiply:
+    case GDK_KEY_KP_Multiply:
       return NS_VK_MULTIPLY;
-    case GDK_KP_Add:
+    case GDK_KEY_KP_Add:
       return NS_VK_ADD;
-    case GDK_KP_Separator:
+    case GDK_KEY_KP_Separator:
       return NS_VK_SEPARATOR;
-    case GDK_KP_Subtract:
+    case GDK_KEY_KP_Subtract:
       return NS_VK_SUBTRACT;
-    case GDK_KP_Decimal:
+    case GDK_KEY_KP_Decimal:
       return NS_VK_DECIMAL;
-    case GDK_KP_Divide:
+    case GDK_KEY_KP_Divide:
       return NS_VK_DIVIDE;
-    case GDK_KP_0:
+    case GDK_KEY_KP_0:
       return NS_VK_NUMPAD0;
-    case GDK_KP_1:
+    case GDK_KEY_KP_1:
       return NS_VK_NUMPAD1;
-    case GDK_KP_2:
+    case GDK_KEY_KP_2:
       return NS_VK_NUMPAD2;
-    case GDK_KP_3:
+    case GDK_KEY_KP_3:
       return NS_VK_NUMPAD3;
-    case GDK_KP_4:
+    case GDK_KEY_KP_4:
       return NS_VK_NUMPAD4;
-    case GDK_KP_5:
+    case GDK_KEY_KP_5:
       return NS_VK_NUMPAD5;
-    case GDK_KP_6:
+    case GDK_KEY_KP_6:
       return NS_VK_NUMPAD6;
-    case GDK_KP_7:
+    case GDK_KEY_KP_7:
       return NS_VK_NUMPAD7;
-    case GDK_KP_8:
+    case GDK_KEY_KP_8:
       return NS_VK_NUMPAD8;
-    case GDK_KP_9:
+    case GDK_KEY_KP_9:
       return NS_VK_NUMPAD9;
   }
 
@@ -1190,11 +1193,11 @@ uint32_t KeymapWrapper::ComputeDOMKeyCode(const GdkEventKey* aGdkKeyEvent) {
 
   // Ignore all modifier state except NumLock.
   guint baseState =
-      (aGdkKeyEvent->state & keymapWrapper->GetGdkModifierMask(NUM_LOCK));
+      (gdk_event_get_modifier_state(GDK_EVENT(aGdkKeyEvent)) & keymapWrapper->GetGdkModifierMask(NUM_LOCK));
 
   // Basically, we should use unmodified character for deciding our keyCode.
   uint32_t unmodifiedChar = keymapWrapper->GetCharCodeFor(
-      aGdkKeyEvent, baseState, aGdkKeyEvent->group);
+      aGdkKeyEvent, baseState);
   if (IsBasicLatinLetterOrNumeral(unmodifiedChar)) {
     // If the unmodified character is an ASCII alphabet or an ASCII
     // numeric, it's the best hint for deciding our keyCode.
@@ -1209,8 +1212,7 @@ uint32_t KeymapWrapper::ComputeDOMKeyCode(const GdkEventKey* aGdkKeyEvent) {
 
   // Retry with shifted keycode.
   guint shiftState = (baseState | keymapWrapper->GetGdkModifierMask(SHIFT));
-  uint32_t shiftedChar = keymapWrapper->GetCharCodeFor(aGdkKeyEvent, shiftState,
-                                                       aGdkKeyEvent->group);
+  uint32_t shiftedChar = keymapWrapper->GetCharCodeFor(aGdkKeyEvent, shiftState);
   if (IsBasicLatinLetterOrNumeral(shiftedChar)) {
     // A shifted character can be an ASCII alphabet on Hebrew keyboard
     // layout. And also shifted character can be an ASCII numeric on
@@ -1231,11 +1233,12 @@ uint32_t KeymapWrapper::ComputeDOMKeyCode(const GdkEventKey* aGdkKeyEvent) {
   // for deciding our keyCode.
   uint32_t unmodCharLatin = 0;
   uint32_t shiftedCharLatin = 0;
-  if (!keymapWrapper->IsLatinGroup(aGdkKeyEvent->group)) {
+  guint group = gdk_key_event_get_layout(GDK_EVENT(aGdkKeyEvent));
+  if (!keymapWrapper->IsLatinGroup(group)) {
     gint minGroup = keymapWrapper->GetFirstLatinGroup();
     if (minGroup >= 0) {
       unmodCharLatin =
-          keymapWrapper->GetCharCodeFor(aGdkKeyEvent, baseState, minGroup);
+          keymapWrapper->GetCharCodeFor(aGdkKeyEvent, baseState);
       if (IsBasicLatinLetterOrNumeral(unmodCharLatin)) {
         // If the unmodified character is an ASCII alphabet or
         // an ASCII numeric, we should use it for the keyCode.
@@ -1248,7 +1251,7 @@ uint32_t KeymapWrapper::ComputeDOMKeyCode(const GdkEventKey* aGdkKeyEvent) {
         unmodCharLatin = 0;
       }
       shiftedCharLatin =
-          keymapWrapper->GetCharCodeFor(aGdkKeyEvent, shiftState, minGroup);
+          keymapWrapper->GetCharCodeFor(aGdkKeyEvent, shiftState);
       if (IsBasicLatinLetterOrNumeral(shiftedCharLatin)) {
         // If the shifted character is an ASCII alphabet or an ASCII
         // numeric, we should use it for the keyCode.
@@ -1296,9 +1299,9 @@ uint32_t KeymapWrapper::ComputeDOMKeyCode(const GdkEventKey* aGdkKeyEvent) {
   return WidgetKeyboardEvent::GetFallbackKeyCodeOfPunctuationKey(code);
 }
 
-KeyNameIndex KeymapWrapper::ComputeDOMKeyNameIndex(
-    const GdkEventKey* aGdkKeyEvent) {
-  switch (aGdkKeyEvent->keyval) {
+KeyNameIndex KeymapWrapper::ComputeDOMKeyNameIndex(GdkKeyEvent* aGdkKeyEvent) {
+  guint keyval = gdk_key_event_get_keyval(GDK_EVENT(aGdkKeyEvent));
+  switch (keyval) {
 #define NS_NATIVE_KEY_TO_DOM_KEY_NAME_INDEX(aNativeKey, aKeyNameIndex) \
   case aNativeKey:                                                     \
     return aKeyNameIndex;
@@ -1315,9 +1318,9 @@ KeyNameIndex KeymapWrapper::ComputeDOMKeyNameIndex(
 }
 
 /* static */
-CodeNameIndex KeymapWrapper::ComputeDOMCodeNameIndex(
-    const GdkEventKey* aGdkKeyEvent) {
-  switch (aGdkKeyEvent->hardware_keycode) {
+CodeNameIndex KeymapWrapper::ComputeDOMCodeNameIndex(GdkKeyEvent* aGdkKeyEvent) {
+  guint keycode = gdk_key_event_get_keycode(GDK_EVENT(aGdkKeyEvent));
+  switch (keycode) {
 #define NS_NATIVE_KEY_TO_DOM_CODE_NAME_INDEX(aNativeKey, aCodeNameIndex) \
   case aNativeKey:                                                       \
     return aCodeNameIndex;
@@ -1335,15 +1338,17 @@ CodeNameIndex KeymapWrapper::ComputeDOMCodeNameIndex(
 
 /* static */
 bool KeymapWrapper::DispatchKeyDownOrKeyUpEvent(nsWindow* aWindow,
-                                                GdkEventKey* aGdkKeyEvent,
+                                                GdkKeyEvent* aGdkKeyEvent,
                                                 bool aIsProcessedByIME,
                                                 bool* aIsCancelled) {
   MOZ_ASSERT(aIsCancelled, "aIsCancelled must not be nullptr");
 
   *aIsCancelled = false;
-
-  if (aGdkKeyEvent->type == GDK_KEY_PRESS && aGdkKeyEvent->keyval == GDK_Tab &&
-      AreModifiersActive(CTRL | ALT, aGdkKeyEvent->state)) {
+  GdkEventType type = gdk_event_get_event_type(GDK_EVENT(aGdkKeyEvent));
+  guint keyval = gdk_key_event_get_keyval(GDK_EVENT(aGdkKeyEvent));
+  GdkModifierType state = gdk_event_get_modifier_state(GDK_EVENT(aGdkKeyEvent));
+  if (type == GDK_KEY_PRESS && keyval == GDK_KEY_Tab &&
+      AreModifiersActive(CTRL | ALT, state)) {
     MOZ_LOG(gKeyLog, LogLevel::Info,
             ("  DispatchKeyDownOrKeyUpEvent(), didn't dispatch keyboard events "
              "because it's Ctrl + Alt + Tab"));
@@ -1351,7 +1356,7 @@ bool KeymapWrapper::DispatchKeyDownOrKeyUpEvent(nsWindow* aWindow,
   }
 
   EventMessage message =
-      aGdkKeyEvent->type == GDK_KEY_PRESS ? eKeyDown : eKeyUp;
+      type == GDK_KEY_PRESS ? eKeyDown : eKeyUp;
   WidgetKeyboardEvent keyEvent(true, message, aWindow);
   KeymapWrapper::InitKeyEvent(keyEvent, aGdkKeyEvent, aIsProcessedByIME);
   return DispatchKeyDownOrKeyUpEvent(aWindow, keyEvent, aIsCancelled);
@@ -1384,7 +1389,7 @@ bool KeymapWrapper::DispatchKeyDownOrKeyUpEvent(
 
 /* static */
 bool KeymapWrapper::MaybeDispatchContextMenuEvent(nsWindow* aWindow,
-                                                  const GdkEventKey* aEvent) {
+                                                   GdkKeyEvent* aEvent) {
   KeyNameIndex keyNameIndex = ComputeDOMKeyNameIndex(aEvent);
 
   // Shift+F10 and ContextMenu should cause eContextMenu event.
@@ -1393,12 +1398,14 @@ bool KeymapWrapper::MaybeDispatchContextMenuEvent(nsWindow* aWindow,
     return false;
   }
 
+  guint32 time = gdk_event_get_time(GDK_EVENT(aEvent));
+  GdkModifierType state = gdk_event_get_modifier_state(GDK_EVENT(aEvent));
   WidgetPointerEvent contextMenuEvent(true, eContextMenu, aWindow,
                                       WidgetMouseEvent::eContextMenuKey);
   contextMenuEvent.mRefPoint = LayoutDeviceIntPoint(0, 0);
-  contextMenuEvent.AssignEventTime(aWindow->GetWidgetEventTime(aEvent->time));
+  contextMenuEvent.AssignEventTime(aWindow->GetWidgetEventTime(time));
   contextMenuEvent.mClickCount = 1;
-  KeymapWrapper::InitInputEvent(contextMenuEvent, aEvent->state);
+  KeymapWrapper::InitInputEvent(contextMenuEvent, state);
 
   if (contextMenuEvent.IsControl() || contextMenuEvent.IsMeta() ||
       contextMenuEvent.IsAlt()) {
@@ -1432,17 +1439,23 @@ bool KeymapWrapper::MaybeDispatchContextMenuEvent(nsWindow* aWindow,
 
 /* static*/
 void KeymapWrapper::HandleKeyPressEvent(nsWindow* aWindow,
-                                        GdkEventKey* aGdkKeyEvent) {
+                                        GdkKeyEvent* aGdkKeyEvent) {
+  guint32 time = gdk_event_get_time(GDK_EVENT(aGdkKeyEvent));
+  GdkModifierType state = gdk_event_get_modifier_state(GDK_EVENT(aGdkKeyEvent));
+  guint keyval = gdk_key_event_get_keyval(GDK_EVENT(aGdkKeyEvent));
+  GdkEventType type = gdk_event_get_event_type(GDK_EVENT(aGdkKeyEvent));
+  gboolean is_modifier = gdk_key_event_is_modifier(GDK_EVENT(aGdkKeyEvent));
+  guint keycode = gdk_key_event_get_keycode(GDK_EVENT(aGdkKeyEvent));
   MOZ_LOG(gKeyLog, LogLevel::Info,
           ("HandleKeyPressEvent(aWindow=%p, aGdkKeyEvent={ type=%s, "
            "keyval=%s(0x%X), state=0x%08X, hardware_keycode=0x%08X, "
            "time=%u, is_modifier=%s })",
            aWindow,
-           ((aGdkKeyEvent->type == GDK_KEY_PRESS) ? "GDK_KEY_PRESS"
+           ((type == GDK_KEY_PRESS) ? "GDK_KEY_PRESS"
                                                   : "GDK_KEY_RELEASE"),
-           gdk_keyval_name(aGdkKeyEvent->keyval), aGdkKeyEvent->keyval,
-           aGdkKeyEvent->state, aGdkKeyEvent->hardware_keycode,
-           aGdkKeyEvent->time, GetBoolName(aGdkKeyEvent->is_modifier)));
+           gdk_keyval_name(keyval), keyval,
+           state, keycode,
+           time, GetBoolName(is_modifier)));
 
   // if we are in the middle of composing text, XIM gets to see it
   // before mozilla does.
@@ -1464,8 +1477,8 @@ void KeymapWrapper::HandleKeyPressEvent(nsWindow* aWindow,
   }
 
   // work around for annoying things.
-  if (aGdkKeyEvent->keyval == GDK_Tab &&
-      AreModifiersActive(CTRL | ALT, aGdkKeyEvent->state)) {
+  if (keyval == GDK_KEY_Tab &&
+      AreModifiersActive(CTRL | ALT, state)) {
     MOZ_LOG(gKeyLog, LogLevel::Info,
             ("  HandleKeyPressEvent(), didn't dispatch keyboard events "
              "because it's Ctrl + Alt + Tab"));
@@ -1514,67 +1527,67 @@ void KeymapWrapper::HandleKeyPressEvent(nsWindow* aWindow,
   }
 
   // Look for specialized app-command keys
-  switch (aGdkKeyEvent->keyval) {
-    case GDK_Back:
+  switch (keyval) {
+    case GDK_KEY_Back:
       aWindow->DispatchCommandEvent(nsGkAtoms::Back);
       MOZ_LOG(gKeyLog, LogLevel::Info,
               ("  HandleKeyPressEvent(), dispatched \"Back\" command event"));
       return;
-    case GDK_Forward:
+    case GDK_KEY_Forward:
       aWindow->DispatchCommandEvent(nsGkAtoms::Forward);
       MOZ_LOG(gKeyLog, LogLevel::Info,
               ("  HandleKeyPressEvent(), dispatched \"Forward\" command "
                "event"));
       return;
-    case GDK_Reload:
-    case GDK_Refresh:
+    case GDK_KEY_Reload:
+    case GDK_KEY_Refresh:
       aWindow->DispatchCommandEvent(nsGkAtoms::Reload);
       return;
-    case GDK_Stop:
+    case GDK_KEY_Stop:
       aWindow->DispatchCommandEvent(nsGkAtoms::Stop);
       MOZ_LOG(gKeyLog, LogLevel::Info,
               ("  HandleKeyPressEvent(), dispatched \"Stop\" command event"));
       return;
-    case GDK_Search:
+    case GDK_KEY_Search:
       aWindow->DispatchCommandEvent(nsGkAtoms::Search);
       MOZ_LOG(gKeyLog, LogLevel::Info,
               ("  HandleKeyPressEvent(), dispatched \"Search\" command event"));
       return;
-    case GDK_Favorites:
+    case GDK_KEY_Favorites:
       aWindow->DispatchCommandEvent(nsGkAtoms::Bookmarks);
       MOZ_LOG(gKeyLog, LogLevel::Info,
               ("  HandleKeyPressEvent(), dispatched \"Bookmarks\" command "
                "event"));
       return;
-    case GDK_HomePage:
+    case GDK_KEY_HomePage:
       aWindow->DispatchCommandEvent(nsGkAtoms::Home);
       return;
-    case GDK_Copy:
-    case GDK_F16:  // F16, F20, F18, F14 are old keysyms for Copy Cut Paste Undo
+    case GDK_KEY_Copy:
+    case GDK_KEY_F16:  // F16, F20, F18, F14 are old keysyms for Copy Cut Paste Undo
       aWindow->DispatchContentCommandEvent(eContentCommandCopy);
       MOZ_LOG(gKeyLog, LogLevel::Info,
               ("  HandleKeyPressEvent(), dispatched \"Copy\" content command "
                "event"));
       return;
-    case GDK_Cut:
-    case GDK_F20:
+    case GDK_KEY_Cut:
+    case GDK_KEY_F20:
       aWindow->DispatchContentCommandEvent(eContentCommandCut);
       MOZ_LOG(gKeyLog, LogLevel::Info,
               ("  HandleKeyPressEvent(), dispatched \"Cut\" content command "
                "event"));
       return;
-    case GDK_Paste:
-    case GDK_F18:
+    case GDK_KEY_Paste:
+    case GDK_KEY_F18:
       aWindow->DispatchContentCommandEvent(eContentCommandPaste);
       MOZ_LOG(gKeyLog, LogLevel::Info,
               ("  HandleKeyPressEvent(), dispatched \"Paste\" content command "
                "event"));
       return;
-    case GDK_Redo:
+    case GDK_KEY_Redo:
       aWindow->DispatchContentCommandEvent(eContentCommandRedo);
       return;
-    case GDK_Undo:
-    case GDK_F14:
+    case GDK_KEY_Undo:
+    case GDK_KEY_F14:
       aWindow->DispatchContentCommandEvent(eContentCommandUndo);
       MOZ_LOG(gKeyLog, LogLevel::Info,
               ("  HandleKeyPressEvent(), dispatched \"Undo\" content command "
@@ -1626,7 +1639,7 @@ void KeymapWrapper::HandleKeyPressEvent(nsWindow* aWindow,
                GetStatusName(status)));
     }
   } else {
-    WidgetEventTime eventTime = aWindow->GetWidgetEventTime(aGdkKeyEvent->time);
+    WidgetEventTime eventTime = aWindow->GetWidgetEventTime(time);
     textEventDispatcher->CommitComposition(status, &keypressEvent.mKeyValue,
                                            &eventTime);
     MOZ_LOG(gKeyLog, LogLevel::Info,
@@ -1637,17 +1650,23 @@ void KeymapWrapper::HandleKeyPressEvent(nsWindow* aWindow,
 
 /* static */
 bool KeymapWrapper::HandleKeyReleaseEvent(nsWindow* aWindow,
-                                          GdkEventKey* aGdkKeyEvent) {
+                                          GdkKeyEvent* aGdkKeyEvent) {
+  guint32 time = gdk_event_get_time(GDK_EVENT(aGdkKeyEvent));
+  GdkModifierType state = gdk_event_get_modifier_state(GDK_EVENT(aGdkKeyEvent));
+  guint keyval = gdk_key_event_get_keyval(GDK_EVENT(aGdkKeyEvent));
+  GdkEventType type = gdk_event_get_event_type(GDK_EVENT(aGdkKeyEvent));
+  gboolean is_modifier = gdk_key_event_is_modifier(GDK_EVENT(aGdkKeyEvent));
+  guint keycode = gdk_key_event_get_keycode(GDK_EVENT(aGdkKeyEvent));
   MOZ_LOG(gKeyLog, LogLevel::Info,
           ("HandleKeyReleaseEvent(aWindow=%p, aGdkKeyEvent={ type=%s, "
            "keyval=%s(0x%X), state=0x%08X, hardware_keycode=0x%08X, "
            "time=%u, is_modifier=%s })",
            aWindow,
-           ((aGdkKeyEvent->type == GDK_KEY_PRESS) ? "GDK_KEY_PRESS"
+           ((type == GDK_KEY_PRESS) ? "GDK_KEY_PRESS"
                                                   : "GDK_KEY_RELEASE"),
-           gdk_keyval_name(aGdkKeyEvent->keyval), aGdkKeyEvent->keyval,
-           aGdkKeyEvent->state, aGdkKeyEvent->hardware_keycode,
-           aGdkKeyEvent->time, GetBoolName(aGdkKeyEvent->is_modifier)));
+           gdk_keyval_name(keyval), keyval,
+           state, keycode,
+           time, GetBoolName(is_modifier)));
 
   RefPtr<IMContextWrapper> imContext = aWindow->GetIMContext();
   if (imContext) {
@@ -1676,10 +1695,14 @@ bool KeymapWrapper::HandleKeyReleaseEvent(nsWindow* aWindow,
   return true;
 }
 
-guint KeymapWrapper::GetModifierState(GdkEventKey* aGdkKeyEvent,
+guint KeymapWrapper::GetModifierState(GdkKeyEvent* aGdkKeyEvent,
                                       KeymapWrapper* aWrapper) {
-  guint state = aGdkKeyEvent->state;
-  if (!aGdkKeyEvent->is_modifier) {
+  guint keyval = gdk_key_event_get_keyval(GDK_EVENT(aGdkKeyEvent));
+  GdkModifierType mod_state = gdk_event_get_modifier_state(GDK_EVENT(aGdkKeyEvent));
+  GdkEventType type = gdk_event_get_event_type(GDK_EVENT(aGdkKeyEvent));
+  gboolean is_modifier = gdk_key_event_is_modifier(GDK_EVENT(aGdkKeyEvent));
+  guint state = GdkModifierType(mod_state);
+  if (!is_modifier) {
     return state;
   }
 #ifdef MOZ_X11
@@ -1712,35 +1735,35 @@ guint KeymapWrapper::GetModifierState(GdkEventKey* aGdkKeyEvent,
 #endif
 #ifdef MOZ_WAYLAND
   int mask = 0;
-  switch (aGdkKeyEvent->keyval) {
-    case GDK_Shift_L:
-    case GDK_Shift_R:
+  switch (keyval) {
+    case GDK_KEY_Shift_L:
+    case GDK_KEY_Shift_R:
       mask = aWrapper->GetGdkModifierMask(SHIFT);
       break;
-    case GDK_Control_L:
-    case GDK_Control_R:
+    case GDK_KEY_Control_L:
+    case GDK_KEY_Control_R:
       mask = aWrapper->GetGdkModifierMask(CTRL);
       break;
-    case GDK_Alt_L:
-    case GDK_Alt_R:
+    case GDK_KEY_Alt_L:
+    case GDK_KEY_Alt_R:
       mask = aWrapper->GetGdkModifierMask(ALT);
       break;
-    case GDK_Super_L:
-    case GDK_Super_R:
+    case GDK_KEY_Super_L:
+    case GDK_KEY_Super_R:
       mask = aWrapper->GetGdkModifierMask(SUPER);
       break;
-    case GDK_Hyper_L:
-    case GDK_Hyper_R:
+    case GDK_KEY_Hyper_L:
+    case GDK_KEY_Hyper_R:
       mask = aWrapper->GetGdkModifierMask(HYPER);
       break;
-    case GDK_Meta_L:
-    case GDK_Meta_R:
+    case GDK_KEY_Meta_L:
+    case GDK_KEY_Meta_R:
       mask = aWrapper->GetGdkModifierMask(META);
       break;
     default:
       break;
   }
-  if (aGdkKeyEvent->type == GDK_KEY_PRESS) {
+  if (type == GDK_KEY_PRESS) {
     state |= mask;
   } else {
     state &= ~mask;
@@ -1751,7 +1774,7 @@ guint KeymapWrapper::GetModifierState(GdkEventKey* aGdkKeyEvent,
 
 /* static */
 void KeymapWrapper::InitKeyEvent(WidgetKeyboardEvent& aKeyEvent,
-                                 GdkEventKey* aGdkKeyEvent,
+                                 GdkKeyEvent* aGdkKeyEvent,
                                  bool aIsProcessedByIME) {
   MOZ_ASSERT(
       !aIsProcessedByIME || aKeyEvent.mMessage != eKeyPress,
@@ -1788,61 +1811,62 @@ void KeymapWrapper::InitKeyEvent(WidgetKeyboardEvent& aKeyEvent,
 
   const guint modifierState = GetModifierState(aGdkKeyEvent, keymapWrapper);
   InitInputEvent(aKeyEvent, modifierState);
+  guint keyval = gdk_key_event_get_keyval(GDK_EVENT(aGdkKeyEvent));
 
-  switch (aGdkKeyEvent->keyval) {
-    case GDK_Shift_L:
-    case GDK_Control_L:
-    case GDK_Alt_L:
-    case GDK_Super_L:
-    case GDK_Hyper_L:
-    case GDK_Meta_L:
+  switch (keyval) {
+    case GDK_KEY_Shift_L:
+    case GDK_KEY_Control_L:
+    case GDK_KEY_Alt_L:
+    case GDK_KEY_Super_L:
+    case GDK_KEY_Hyper_L:
+    case GDK_KEY_Meta_L:
       aKeyEvent.mLocation = eKeyLocationLeft;
       break;
 
-    case GDK_Shift_R:
-    case GDK_Control_R:
-    case GDK_Alt_R:
-    case GDK_Super_R:
-    case GDK_Hyper_R:
-    case GDK_Meta_R:
+    case GDK_KEY_Shift_R:
+    case GDK_KEY_Control_R:
+    case GDK_KEY_Alt_R:
+    case GDK_KEY_Super_R:
+    case GDK_KEY_Hyper_R:
+    case GDK_KEY_Meta_R:
       aKeyEvent.mLocation = eKeyLocationRight;
       break;
 
-    case GDK_KP_0:
-    case GDK_KP_1:
-    case GDK_KP_2:
-    case GDK_KP_3:
-    case GDK_KP_4:
-    case GDK_KP_5:
-    case GDK_KP_6:
-    case GDK_KP_7:
-    case GDK_KP_8:
-    case GDK_KP_9:
-    case GDK_KP_Space:
-    case GDK_KP_Tab:
-    case GDK_KP_Enter:
-    case GDK_KP_F1:
-    case GDK_KP_F2:
-    case GDK_KP_F3:
-    case GDK_KP_F4:
-    case GDK_KP_Home:
-    case GDK_KP_Left:
-    case GDK_KP_Up:
-    case GDK_KP_Right:
-    case GDK_KP_Down:
-    case GDK_KP_Prior:  // same as GDK_KP_Page_Up
-    case GDK_KP_Next:   // same as GDK_KP_Page_Down
-    case GDK_KP_End:
-    case GDK_KP_Begin:
-    case GDK_KP_Insert:
-    case GDK_KP_Delete:
-    case GDK_KP_Equal:
-    case GDK_KP_Multiply:
-    case GDK_KP_Add:
-    case GDK_KP_Separator:
-    case GDK_KP_Subtract:
-    case GDK_KP_Decimal:
-    case GDK_KP_Divide:
+    case GDK_KEY_KP_0:
+    case GDK_KEY_KP_1:
+    case GDK_KEY_KP_2:
+    case GDK_KEY_KP_3:
+    case GDK_KEY_KP_4:
+    case GDK_KEY_KP_5:
+    case GDK_KEY_KP_6:
+    case GDK_KEY_KP_7:
+    case GDK_KEY_KP_8:
+    case GDK_KEY_KP_9:
+    case GDK_KEY_KP_Space:
+    case GDK_KEY_KP_Tab:
+    case GDK_KEY_KP_Enter:
+    case GDK_KEY_KP_F1:
+    case GDK_KEY_KP_F2:
+    case GDK_KEY_KP_F3:
+    case GDK_KEY_KP_F4:
+    case GDK_KEY_KP_Home:
+    case GDK_KEY_KP_Left:
+    case GDK_KEY_KP_Up:
+    case GDK_KEY_KP_Right:
+    case GDK_KEY_KP_Down:
+    case GDK_KEY_KP_Prior:  // same as GDK_KP_Page_Up
+    case GDK_KEY_KP_Next:   // same as GDK_KP_Page_Down
+    case GDK_KEY_KP_End:
+    case GDK_KEY_KP_Begin:
+    case GDK_KEY_KP_Insert:
+    case GDK_KEY_KP_Delete:
+    case GDK_KEY_KP_Equal:
+    case GDK_KEY_KP_Multiply:
+    case GDK_KEY_KP_Add:
+    case GDK_KEY_KP_Separator:
+    case GDK_KEY_KP_Subtract:
+    case GDK_KEY_KP_Decimal:
+    case GDK_KEY_KP_Divide:
       aKeyEvent.mLocation = eKeyLocationNumpad;
       break;
 
@@ -1855,10 +1879,11 @@ void KeymapWrapper::InitKeyEvent(WidgetKeyboardEvent& aKeyEvent,
   // so link to the GdkEvent (which will vanish soon after return from the
   // event callback) to give plugins access to hardware_keycode and state.
   // (An XEvent would be nice but the GdkEvent is good enough.)
+  guint keycode = gdk_key_event_get_keycode(GDK_EVENT(aGdkKeyEvent));
   aKeyEvent.mNativeKeyEvent = static_cast<void*>(aGdkKeyEvent);
   aKeyEvent.mIsRepeat =
       sRepeatState == REPEATING &&
-      aGdkKeyEvent->hardware_keycode == sLastRepeatableHardwareKeyCode;
+      keycode == sLastRepeatableHardwareKeyCode;
 
   MOZ_LOG(
       gKeyLog, LogLevel::Info,
@@ -1881,49 +1906,50 @@ void KeymapWrapper::InitKeyEvent(WidgetKeyboardEvent& aKeyEvent,
 }
 
 /* static */
-uint32_t KeymapWrapper::GetCharCodeFor(const GdkEventKey* aGdkKeyEvent) {
+uint32_t KeymapWrapper::GetCharCodeFor(GdkKeyEvent* aGdkKeyEvent) {
   // Anything above 0xf000 is considered a non-printable
   // Exception: directly encoded UCS characters
-  if (aGdkKeyEvent->keyval > 0xf000 &&
-      (aGdkKeyEvent->keyval & 0xff000000) != 0x01000000) {
+  guint keyval = gdk_key_event_get_keyval(GDK_EVENT(aGdkKeyEvent));
+  if (keyval > 0xf000 &&
+      (keyval & 0xff000000) != 0x01000000) {
     // Keypad keys are an exception: they return a value different
     // from their non-keypad equivalents, but mozilla doesn't distinguish.
-    switch (aGdkKeyEvent->keyval) {
-      case GDK_KP_Space:
+    switch (keyval) {
+      case GDK_KEY_KP_Space:
         return ' ';
-      case GDK_KP_Equal:
+      case GDK_KEY_KP_Equal:
         return '=';
-      case GDK_KP_Multiply:
+      case GDK_KEY_KP_Multiply:
         return '*';
-      case GDK_KP_Add:
+      case GDK_KEY_KP_Add:
         return '+';
-      case GDK_KP_Separator:
+      case GDK_KEY_KP_Separator:
         return ',';
-      case GDK_KP_Subtract:
+      case GDK_KEY_KP_Subtract:
         return '-';
-      case GDK_KP_Decimal:
+      case GDK_KEY_KP_Decimal:
         return '.';
-      case GDK_KP_Divide:
+      case GDK_KEY_KP_Divide:
         return '/';
-      case GDK_KP_0:
+      case GDK_KEY_KP_0:
         return '0';
-      case GDK_KP_1:
+      case GDK_KEY_KP_1:
         return '1';
-      case GDK_KP_2:
+      case GDK_KEY_KP_2:
         return '2';
-      case GDK_KP_3:
+      case GDK_KEY_KP_3:
         return '3';
-      case GDK_KP_4:
+      case GDK_KEY_KP_4:
         return '4';
-      case GDK_KP_5:
+      case GDK_KEY_KP_5:
         return '5';
-      case GDK_KP_6:
+      case GDK_KEY_KP_6:
         return '6';
-      case GDK_KP_7:
+      case GDK_KEY_KP_7:
         return '7';
-      case GDK_KP_8:
+      case GDK_KEY_KP_8:
         return '8';
-      case GDK_KP_9:
+      case GDK_KEY_KP_9:
         return '9';
       default:
         return 0;  // non-printables
@@ -1933,7 +1959,7 @@ uint32_t KeymapWrapper::GetCharCodeFor(const GdkEventKey* aGdkKeyEvent) {
   static const long MAX_UNICODE = 0x10FFFF;
 
   // we're supposedly printable, let's try to convert
-  long ucs = keysym2ucs(aGdkKeyEvent->keyval);
+  long ucs = keysym2ucs(keyval);
   if ((ucs != -1) && (ucs < MAX_UNICODE)) {
     return ucs;
   }
@@ -1942,8 +1968,9 @@ uint32_t KeymapWrapper::GetCharCodeFor(const GdkEventKey* aGdkKeyEvent) {
   return 0;
 }
 
-uint32_t KeymapWrapper::GetCharCodeFor(const GdkEventKey* aGdkKeyEvent,
-                                       guint aGdkModifierState, gint aGroup) {
+uint32_t KeymapWrapper::GetCharCodeFor(GdkKeyEvent* aGdkKeyEvent,
+                                       guint aGdkModifierState) {
+  /*
   guint keyval;
   if (!gdk_keymap_translate_keyboard_state(
           mGdkKeymap, aGdkKeyEvent->hardware_keycode,
@@ -1955,18 +1982,19 @@ uint32_t KeymapWrapper::GetCharCodeFor(const GdkEventKey* aGdkKeyEvent,
   tmpEvent.state = aGdkModifierState;
   tmpEvent.keyval = keyval;
   tmpEvent.group = aGroup;
-  return GetCharCodeFor(&tmpEvent);
+  */
+  return GetCharCodeFor(aGdkKeyEvent);
 }
 
-uint32_t KeymapWrapper::GetUnmodifiedCharCodeFor(
-    const GdkEventKey* aGdkKeyEvent) {
+uint32_t KeymapWrapper::GetUnmodifiedCharCodeFor(GdkKeyEvent* aGdkKeyEvent) {
+  GdkModifierType mod_state = gdk_event_get_modifier_state(GDK_EVENT(aGdkKeyEvent));
   guint state =
-      aGdkKeyEvent->state &
+      mod_state &
       (GetGdkModifierMask(SHIFT) | GetGdkModifierMask(CAPS_LOCK) |
        GetGdkModifierMask(NUM_LOCK) | GetGdkModifierMask(SCROLL_LOCK) |
        GetGdkModifierMask(LEVEL3) | GetGdkModifierMask(LEVEL5));
   uint32_t charCode =
-      GetCharCodeFor(aGdkKeyEvent, GdkModifierType(state), aGdkKeyEvent->group);
+      GetCharCodeFor(aGdkKeyEvent, GdkModifierType(state));
   if (charCode) {
     return charCode;
   }
@@ -1978,26 +2006,28 @@ uint32_t KeymapWrapper::GetUnmodifiedCharCodeFor(
   if (state == stateWithoutAltGraph) {
     return 0;
   }
-  return GetCharCodeFor(aGdkKeyEvent, GdkModifierType(stateWithoutAltGraph),
-                        aGdkKeyEvent->group);
+  return GetCharCodeFor(aGdkKeyEvent, GdkModifierType(stateWithoutAltGraph));
 }
 
-gint KeymapWrapper::GetKeyLevel(GdkEventKey* aGdkKeyEvent) {
-  gint level;
+gint KeymapWrapper::GetKeyLevel(GdkKeyEvent* aGdkKeyEvent) {
+  guint level = gdk_key_event_get_level(GDK_EVENT(aGdkKeyEvent));
+  /*
   if (!gdk_keymap_translate_keyboard_state(
           mGdkKeymap, aGdkKeyEvent->hardware_keycode,
           GdkModifierType(aGdkKeyEvent->state), aGdkKeyEvent->group, nullptr,
           nullptr, &level, nullptr)) {
     return -1;
   }
+  */
   return level;
 }
 
 gint KeymapWrapper::GetFirstLatinGroup() {
+  GdkDisplay* display = gdk_display_get_default();
   GdkKeymapKey* keys;
   gint count;
   gint minGroup = -1;
-  if (gdk_keymap_get_entries_for_keyval(mGdkKeymap, GDK_a, &keys, &count)) {
+  if (gdk_display_map_keyval(display, GDK_KEY_a, &keys, &count)) {
     // find the minimum number group for latin inputtable layout
     for (gint i = 0; i < count && minGroup != 0; ++i) {
       if (keys[i].level != 0 && keys[i].level != 1) {
@@ -2014,10 +2044,11 @@ gint KeymapWrapper::GetFirstLatinGroup() {
 }
 
 bool KeymapWrapper::IsLatinGroup(guint8 aGroup) {
+  GdkDisplay* display = gdk_display_get_default();
   GdkKeymapKey* keys;
   gint count;
   bool result = false;
-  if (gdk_keymap_get_entries_for_keyval(mGdkKeymap, GDK_a, &keys, &count)) {
+  if (gdk_display_map_keyval(display, GDK_KEY_a, &keys, &count)) {
     for (gint i = 0; i < count; ++i) {
       if (keys[i].level != 0 && keys[i].level != 1) {
         continue;
@@ -2052,16 +2083,11 @@ bool KeymapWrapper::IsBasicLatinLetterOrNumeral(uint32_t aCharCode) {
 }
 
 /* static */
-guint KeymapWrapper::GetGDKKeyvalWithoutModifier(
-    const GdkEventKey* aGdkKeyEvent) {
-  KeymapWrapper* keymapWrapper = GetInstance();
-  guint state =
-      (aGdkKeyEvent->state & keymapWrapper->GetGdkModifierMask(NUM_LOCK));
+guint KeymapWrapper::GetGDKKeyvalWithoutModifier(GdkKeyEvent* aGdkKeyEvent) {
+  //KeymapWrapper* keymapWrapper = GetInstance();
   guint keyval;
-  if (!gdk_keymap_translate_keyboard_state(
-          keymapWrapper->mGdkKeymap, aGdkKeyEvent->hardware_keycode,
-          GdkModifierType(state), aGdkKeyEvent->group, &keyval, nullptr,
-          nullptr, nullptr)) {
+  GdkModifierType* modifiers = nullptr;
+  if (!gdk_key_event_get_match(GDK_EVENT(aGdkKeyEvent), &keyval, modifiers)) {
     return 0;
   }
   return keyval;
@@ -2090,18 +2116,18 @@ struct KeyPair {
 // GTK keycodes are defined in <gdk/gdkkeysyms.h>
 //
 static const KeyPair gKeyPairs[] = {
-    {NS_VK_CANCEL, GDK_Cancel},
-    {NS_VK_BACK, GDK_BackSpace},
-    {NS_VK_TAB, GDK_Tab},
-    {NS_VK_CLEAR, GDK_Clear},
-    {NS_VK_RETURN, GDK_Return},
-    {NS_VK_SHIFT, GDK_Shift_L},
-    {NS_VK_CONTROL, GDK_Control_L},
-    {NS_VK_ALT, GDK_Alt_L},
-    {NS_VK_META, GDK_Meta_L},
+    {NS_VK_CANCEL, GDK_KEY_Cancel},
+    {NS_VK_BACK, GDK_KEY_BackSpace},
+    {NS_VK_TAB, GDK_KEY_Tab},
+    {NS_VK_CLEAR, GDK_KEY_Clear},
+    {NS_VK_RETURN, GDK_KEY_Return},
+    {NS_VK_SHIFT, GDK_KEY_Shift_L},
+    {NS_VK_CONTROL, GDK_KEY_Control_L},
+    {NS_VK_ALT, GDK_KEY_Alt_L},
+    {NS_VK_META, GDK_KEY_Meta_L},
 
     // Assume that Super or Hyper is always mapped to physical Win key.
-    {NS_VK_WIN, GDK_Super_L},
+    {NS_VK_WIN, GDK_KEY_Super_L},
 
     // GTK's AltGraph key is similar to Mac's Option (Alt) key.  However,
     // unfortunately, browsers on Mac are using NS_VK_ALT for it even though
@@ -2112,122 +2138,122 @@ static const KeyPair gKeyPairs[] = {
     // For some languages' users, AltGraph key is important, so, web
     // applications on such locale may want to know AltGraph key press.
     // Therefore, we should map AltGr keycode for them only on GTK.
-    {NS_VK_ALTGR, GDK_ISO_Level3_Shift},
+    {NS_VK_ALTGR, GDK_KEY_ISO_Level3_Shift},
 
-    {NS_VK_PAUSE, GDK_Pause},
-    {NS_VK_CAPS_LOCK, GDK_Caps_Lock},
-    {NS_VK_ESCAPE, GDK_Escape},
+    {NS_VK_PAUSE, GDK_KEY_Pause},
+    {NS_VK_CAPS_LOCK, GDK_KEY_Caps_Lock},
+    {NS_VK_ESCAPE, GDK_KEY_Escape},
     // { NS_VK_ACCEPT,     GDK_XXX },
     // { NS_VK_MODECHANGE, GDK_XXX },
-    {NS_VK_SPACE, GDK_space},
-    {NS_VK_PAGE_UP, GDK_Page_Up},
-    {NS_VK_PAGE_DOWN, GDK_Page_Down},
-    {NS_VK_END, GDK_End},
-    {NS_VK_HOME, GDK_Home},
-    {NS_VK_LEFT, GDK_Left},
-    {NS_VK_UP, GDK_Up},
-    {NS_VK_RIGHT, GDK_Right},
-    {NS_VK_DOWN, GDK_Down},
-    {NS_VK_SELECT, GDK_Select},
-    {NS_VK_PRINT, GDK_Print},
-    {NS_VK_EXECUTE, GDK_Execute},
-    {NS_VK_PRINTSCREEN, GDK_Print},
-    {NS_VK_INSERT, GDK_Insert},
-    {NS_VK_DELETE, GDK_Delete},
-    {NS_VK_HELP, GDK_Help},
+    {NS_VK_SPACE, GDK_KEY_space},
+    {NS_VK_PAGE_UP, GDK_KEY_Page_Up},
+    {NS_VK_PAGE_DOWN, GDK_KEY_Page_Down},
+    {NS_VK_END, GDK_KEY_End},
+    {NS_VK_HOME, GDK_KEY_Home},
+    {NS_VK_LEFT, GDK_KEY_Left},
+    {NS_VK_UP, GDK_KEY_Up},
+    {NS_VK_RIGHT, GDK_KEY_Right},
+    {NS_VK_DOWN, GDK_KEY_Down},
+    {NS_VK_SELECT, GDK_KEY_Select},
+    {NS_VK_PRINT, GDK_KEY_Print},
+    {NS_VK_EXECUTE, GDK_KEY_Execute},
+    {NS_VK_PRINTSCREEN, GDK_KEY_Print},
+    {NS_VK_INSERT, GDK_KEY_Insert},
+    {NS_VK_DELETE, GDK_KEY_Delete},
+    {NS_VK_HELP, GDK_KEY_Help},
 
-    {NS_VK_NUM_LOCK, GDK_Num_Lock},
-    {NS_VK_SCROLL_LOCK, GDK_Scroll_Lock},
+    {NS_VK_NUM_LOCK, GDK_KEY_Num_Lock},
+    {NS_VK_SCROLL_LOCK, GDK_KEY_Scroll_Lock},
 
     // Function keys
-    {NS_VK_F1, GDK_F1},
-    {NS_VK_F2, GDK_F2},
-    {NS_VK_F3, GDK_F3},
-    {NS_VK_F4, GDK_F4},
-    {NS_VK_F5, GDK_F5},
-    {NS_VK_F6, GDK_F6},
-    {NS_VK_F7, GDK_F7},
-    {NS_VK_F8, GDK_F8},
-    {NS_VK_F9, GDK_F9},
-    {NS_VK_F10, GDK_F10},
-    {NS_VK_F11, GDK_F11},
-    {NS_VK_F12, GDK_F12},
-    {NS_VK_F13, GDK_F13},
-    {NS_VK_F14, GDK_F14},
-    {NS_VK_F15, GDK_F15},
-    {NS_VK_F16, GDK_F16},
-    {NS_VK_F17, GDK_F17},
-    {NS_VK_F18, GDK_F18},
-    {NS_VK_F19, GDK_F19},
-    {NS_VK_F20, GDK_F20},
-    {NS_VK_F21, GDK_F21},
-    {NS_VK_F22, GDK_F22},
-    {NS_VK_F23, GDK_F23},
-    {NS_VK_F24, GDK_F24},
+    {NS_VK_F1, GDK_KEY_F1},
+    {NS_VK_F2, GDK_KEY_F2},
+    {NS_VK_F3, GDK_KEY_F3},
+    {NS_VK_F4, GDK_KEY_F4},
+    {NS_VK_F5, GDK_KEY_F5},
+    {NS_VK_F6, GDK_KEY_F6},
+    {NS_VK_F7, GDK_KEY_F7},
+    {NS_VK_F8, GDK_KEY_F8},
+    {NS_VK_F9, GDK_KEY_F9},
+    {NS_VK_F10, GDK_KEY_F10},
+    {NS_VK_F11, GDK_KEY_F11},
+    {NS_VK_F12, GDK_KEY_F12},
+    {NS_VK_F13, GDK_KEY_F13},
+    {NS_VK_F14, GDK_KEY_F14},
+    {NS_VK_F15, GDK_KEY_F15},
+    {NS_VK_F16, GDK_KEY_F16},
+    {NS_VK_F17, GDK_KEY_F17},
+    {NS_VK_F18, GDK_KEY_F18},
+    {NS_VK_F19, GDK_KEY_F19},
+    {NS_VK_F20, GDK_KEY_F20},
+    {NS_VK_F21, GDK_KEY_F21},
+    {NS_VK_F22, GDK_KEY_F22},
+    {NS_VK_F23, GDK_KEY_F23},
+    {NS_VK_F24, GDK_KEY_F24},
 
     // context menu key, keysym 0xff67, typically keycode 117 on 105-key
     // (Microsoft) x86 keyboards, located between right 'Windows' key and right
     // Ctrl key
-    {NS_VK_CONTEXT_MENU, GDK_Menu},
-    {NS_VK_SLEEP, GDK_Sleep},
+    {NS_VK_CONTEXT_MENU, GDK_KEY_Menu},
+    {NS_VK_SLEEP, GDK_KEY_Sleep},
 
-    {NS_VK_ATTN, GDK_3270_Attn},
-    {NS_VK_CRSEL, GDK_3270_CursorSelect},
-    {NS_VK_EXSEL, GDK_3270_ExSelect},
-    {NS_VK_EREOF, GDK_3270_EraseEOF},
-    {NS_VK_PLAY, GDK_3270_Play},
+    {NS_VK_ATTN, GDK_KEY_3270_Attn},
+    {NS_VK_CRSEL, GDK_KEY_3270_CursorSelect},
+    {NS_VK_EXSEL, GDK_KEY_3270_ExSelect},
+    {NS_VK_EREOF, GDK_KEY_3270_EraseEOF},
+    {NS_VK_PLAY, GDK_KEY_3270_Play},
     //{ NS_VK_ZOOM,       GDK_XXX },
-    {NS_VK_PA1, GDK_3270_PA1},
+    {NS_VK_PA1, GDK_KEY_3270_PA1},
 
-    {NS_VK_MULTIPLY, GDK_KP_Multiply},
-    {NS_VK_ADD, GDK_KP_Add},
-    {NS_VK_SEPARATOR, GDK_KP_Separator},
-    {NS_VK_SUBTRACT, GDK_KP_Subtract},
-    {NS_VK_DECIMAL, GDK_KP_Decimal},
-    {NS_VK_DIVIDE, GDK_KP_Divide},
-    {NS_VK_NUMPAD0, GDK_KP_0},
-    {NS_VK_NUMPAD1, GDK_KP_1},
-    {NS_VK_NUMPAD2, GDK_KP_2},
-    {NS_VK_NUMPAD3, GDK_KP_3},
-    {NS_VK_NUMPAD4, GDK_KP_4},
-    {NS_VK_NUMPAD5, GDK_KP_5},
-    {NS_VK_NUMPAD6, GDK_KP_6},
-    {NS_VK_NUMPAD7, GDK_KP_7},
-    {NS_VK_NUMPAD8, GDK_KP_8},
-    {NS_VK_NUMPAD9, GDK_KP_9},
-    {NS_VK_SPACE, GDK_space},
-    {NS_VK_COLON, GDK_colon},
-    {NS_VK_SEMICOLON, GDK_semicolon},
-    {NS_VK_LESS_THAN, GDK_less},
-    {NS_VK_EQUALS, GDK_equal},
-    {NS_VK_GREATER_THAN, GDK_greater},
-    {NS_VK_QUESTION_MARK, GDK_question},
-    {NS_VK_AT, GDK_at},
-    {NS_VK_CIRCUMFLEX, GDK_asciicircum},
-    {NS_VK_EXCLAMATION, GDK_exclam},
-    {NS_VK_DOUBLE_QUOTE, GDK_quotedbl},
-    {NS_VK_HASH, GDK_numbersign},
-    {NS_VK_DOLLAR, GDK_dollar},
-    {NS_VK_PERCENT, GDK_percent},
-    {NS_VK_AMPERSAND, GDK_ampersand},
-    {NS_VK_UNDERSCORE, GDK_underscore},
-    {NS_VK_OPEN_PAREN, GDK_parenleft},
-    {NS_VK_CLOSE_PAREN, GDK_parenright},
-    {NS_VK_ASTERISK, GDK_asterisk},
-    {NS_VK_PLUS, GDK_plus},
-    {NS_VK_PIPE, GDK_bar},
-    {NS_VK_HYPHEN_MINUS, GDK_minus},
-    {NS_VK_OPEN_CURLY_BRACKET, GDK_braceleft},
-    {NS_VK_CLOSE_CURLY_BRACKET, GDK_braceright},
-    {NS_VK_TILDE, GDK_asciitilde},
-    {NS_VK_COMMA, GDK_comma},
-    {NS_VK_PERIOD, GDK_period},
-    {NS_VK_SLASH, GDK_slash},
-    {NS_VK_BACK_QUOTE, GDK_grave},
-    {NS_VK_OPEN_BRACKET, GDK_bracketleft},
-    {NS_VK_BACK_SLASH, GDK_backslash},
-    {NS_VK_CLOSE_BRACKET, GDK_bracketright},
-    {NS_VK_QUOTE, GDK_apostrophe},
+    {NS_VK_MULTIPLY, GDK_KEY_KP_Multiply},
+    {NS_VK_ADD, GDK_KEY_KP_Add},
+    {NS_VK_SEPARATOR, GDK_KEY_KP_Separator},
+    {NS_VK_SUBTRACT, GDK_KEY_KP_Subtract},
+    {NS_VK_DECIMAL, GDK_KEY_KP_Decimal},
+    {NS_VK_DIVIDE, GDK_KEY_KP_Divide},
+    {NS_VK_NUMPAD0, GDK_KEY_KP_0},
+    {NS_VK_NUMPAD1, GDK_KEY_KP_1},
+    {NS_VK_NUMPAD2, GDK_KEY_KP_2},
+    {NS_VK_NUMPAD3, GDK_KEY_KP_3},
+    {NS_VK_NUMPAD4, GDK_KEY_KP_4},
+    {NS_VK_NUMPAD5, GDK_KEY_KP_5},
+    {NS_VK_NUMPAD6, GDK_KEY_KP_6},
+    {NS_VK_NUMPAD7, GDK_KEY_KP_7},
+    {NS_VK_NUMPAD8, GDK_KEY_KP_8},
+    {NS_VK_NUMPAD9, GDK_KEY_KP_9},
+    {NS_VK_SPACE, GDK_KEY_space},
+    {NS_VK_COLON, GDK_KEY_colon},
+    {NS_VK_SEMICOLON, GDK_KEY_semicolon},
+    {NS_VK_LESS_THAN, GDK_KEY_less},
+    {NS_VK_EQUALS, GDK_KEY_equal},
+    {NS_VK_GREATER_THAN, GDK_KEY_greater},
+    {NS_VK_QUESTION_MARK, GDK_KEY_question},
+    {NS_VK_AT, GDK_KEY_at},
+    {NS_VK_CIRCUMFLEX, GDK_KEY_asciicircum},
+    {NS_VK_EXCLAMATION, GDK_KEY_exclam},
+    {NS_VK_DOUBLE_QUOTE, GDK_KEY_quotedbl},
+    {NS_VK_HASH, GDK_KEY_numbersign},
+    {NS_VK_DOLLAR, GDK_KEY_dollar},
+    {NS_VK_PERCENT, GDK_KEY_percent},
+    {NS_VK_AMPERSAND, GDK_KEY_ampersand},
+    {NS_VK_UNDERSCORE, GDK_KEY_underscore},
+    {NS_VK_OPEN_PAREN, GDK_KEY_parenleft},
+    {NS_VK_CLOSE_PAREN, GDK_KEY_parenright},
+    {NS_VK_ASTERISK, GDK_KEY_asterisk},
+    {NS_VK_PLUS, GDK_KEY_plus},
+    {NS_VK_PIPE, GDK_KEY_bar},
+    {NS_VK_HYPHEN_MINUS, GDK_KEY_minus},
+    {NS_VK_OPEN_CURLY_BRACKET, GDK_KEY_braceleft},
+    {NS_VK_CLOSE_CURLY_BRACKET, GDK_KEY_braceright},
+    {NS_VK_TILDE, GDK_KEY_asciitilde},
+    {NS_VK_COMMA, GDK_KEY_comma},
+    {NS_VK_PERIOD, GDK_KEY_period},
+    {NS_VK_SLASH, GDK_KEY_slash},
+    {NS_VK_BACK_QUOTE, GDK_KEY_grave},
+    {NS_VK_OPEN_BRACKET, GDK_KEY_bracketleft},
+    {NS_VK_BACK_SLASH, GDK_KEY_backslash},
+    {NS_VK_CLOSE_BRACKET, GDK_KEY_bracketright},
+    {NS_VK_QUOTE, GDK_KEY_apostrophe},
 };
 
 /* static */
@@ -2260,7 +2286,7 @@ guint KeymapWrapper::ConvertGeckoKeyCodeToGDKKeyval(const nsAString& aKeyCode) {
   // numbers
   if (keyCode >= NS_VK_0 && keyCode <= NS_VK_9) {
     // gdk and DOM both use the ASCII codes for these keys.
-    return keyCode - NS_VK_0 + GDK_0;
+    return keyCode - NS_VK_0 + GDK_KEY_0;
   }
 
   // misc other things
@@ -2276,36 +2302,36 @@ guint KeymapWrapper::ConvertGeckoKeyCodeToGDKKeyval(const nsAString& aKeyCode) {
 /* static */
 uint32_t KeymapWrapper::GetDOMKeyCodeFromKeyPairs(guint aGdkKeyval) {
   switch (aGdkKeyval) {
-    case GDK_Cancel:
+    case GDK_KEY_Cancel:
       return NS_VK_CANCEL;
-    case GDK_BackSpace:
+    case GDK_KEY_BackSpace:
       return NS_VK_BACK;
-    case GDK_Tab:
-    case GDK_ISO_Left_Tab:
+    case GDK_KEY_Tab:
+    case GDK_KEY_ISO_Left_Tab:
       return NS_VK_TAB;
-    case GDK_Clear:
+    case GDK_KEY_Clear:
       return NS_VK_CLEAR;
-    case GDK_Return:
+    case GDK_KEY_Return:
       return NS_VK_RETURN;
-    case GDK_Shift_L:
-    case GDK_Shift_R:
-    case GDK_Shift_Lock:
+    case GDK_KEY_Shift_L:
+    case GDK_KEY_Shift_R:
+    case GDK_KEY_Shift_Lock:
       return NS_VK_SHIFT;
-    case GDK_Control_L:
-    case GDK_Control_R:
+    case GDK_KEY_Control_L:
+    case GDK_KEY_Control_R:
       return NS_VK_CONTROL;
-    case GDK_Alt_L:
-    case GDK_Alt_R:
+    case GDK_KEY_Alt_L:
+    case GDK_KEY_Alt_R:
       return NS_VK_ALT;
-    case GDK_Meta_L:
-    case GDK_Meta_R:
+    case GDK_KEY_Meta_L:
+    case GDK_KEY_Meta_R:
       return NS_VK_META;
 
     // Assume that Super or Hyper is always mapped to physical Win key.
-    case GDK_Super_L:
-    case GDK_Super_R:
-    case GDK_Hyper_L:
-    case GDK_Hyper_R:
+    case GDK_KEY_Super_L:
+    case GDK_KEY_Super_R:
+    case GDK_KEY_Hyper_L:
+    case GDK_KEY_Hyper_R:
       return NS_VK_WIN;
 
     // GTK's AltGraph key is similar to Mac's Option (Alt) key.  However,
@@ -2317,168 +2343,168 @@ uint32_t KeymapWrapper::GetDOMKeyCodeFromKeyPairs(guint aGdkKeyval) {
     // pressed.  For some languages' users, AltGraph key is important, so,
     // web applications on such locale may want to know AltGraph key press.
     // Therefore, we should map AltGr keycode for them only on GTK.
-    case GDK_ISO_Level3_Shift:
-    case GDK_ISO_Level5_Shift:
+    case GDK_KEY_ISO_Level3_Shift:
+    case GDK_KEY_ISO_Level5_Shift:
     // We assume that Mode_switch is always used for level3 shift.
-    case GDK_Mode_switch:
+    case GDK_KEY_Mode_switch:
       return NS_VK_ALTGR;
 
-    case GDK_Pause:
+    case GDK_KEY_Pause:
       return NS_VK_PAUSE;
-    case GDK_Caps_Lock:
+    case GDK_KEY_Caps_Lock:
       return NS_VK_CAPS_LOCK;
-    case GDK_Kana_Lock:
-    case GDK_Kana_Shift:
+    case GDK_KEY_Kana_Lock:
+    case GDK_KEY_Kana_Shift:
       return NS_VK_KANA;
-    case GDK_Hangul:
+    case GDK_KEY_Hangul:
       return NS_VK_HANGUL;
     // case GDK_XXX:                   return NS_VK_JUNJA;
     // case GDK_XXX:                   return NS_VK_FINAL;
-    case GDK_Hangul_Hanja:
+    case GDK_KEY_Hangul_Hanja:
       return NS_VK_HANJA;
-    case GDK_Kanji:
+    case GDK_KEY_Kanji:
       return NS_VK_KANJI;
-    case GDK_Escape:
+    case GDK_KEY_Escape:
       return NS_VK_ESCAPE;
-    case GDK_Henkan:
+    case GDK_KEY_Henkan:
       return NS_VK_CONVERT;
-    case GDK_Muhenkan:
+    case GDK_KEY_Muhenkan:
       return NS_VK_NONCONVERT;
     // case GDK_XXX:                   return NS_VK_ACCEPT;
     // case GDK_XXX:                   return NS_VK_MODECHANGE;
-    case GDK_Page_Up:
+    case GDK_KEY_Page_Up:
       return NS_VK_PAGE_UP;
-    case GDK_Page_Down:
+    case GDK_KEY_Page_Down:
       return NS_VK_PAGE_DOWN;
-    case GDK_End:
+    case GDK_KEY_End:
       return NS_VK_END;
-    case GDK_Home:
+    case GDK_KEY_Home:
       return NS_VK_HOME;
-    case GDK_Left:
+    case GDK_KEY_Left:
       return NS_VK_LEFT;
-    case GDK_Up:
+    case GDK_KEY_Up:
       return NS_VK_UP;
-    case GDK_Right:
+    case GDK_KEY_Right:
       return NS_VK_RIGHT;
-    case GDK_Down:
+    case GDK_KEY_Down:
       return NS_VK_DOWN;
-    case GDK_Select:
+    case GDK_KEY_Select:
       return NS_VK_SELECT;
-    case GDK_Print:
+    case GDK_KEY_Print:
       return NS_VK_PRINT;
-    case GDK_Execute:
+    case GDK_KEY_Execute:
       return NS_VK_EXECUTE;
-    case GDK_Insert:
+    case GDK_KEY_Insert:
       return NS_VK_INSERT;
-    case GDK_Delete:
+    case GDK_KEY_Delete:
       return NS_VK_DELETE;
-    case GDK_Help:
+    case GDK_KEY_Help:
       return NS_VK_HELP;
 
     // keypad keys
-    case GDK_KP_Left:
+    case GDK_KEY_KP_Left:
       return NS_VK_LEFT;
-    case GDK_KP_Right:
+    case GDK_KEY_KP_Right:
       return NS_VK_RIGHT;
-    case GDK_KP_Up:
+    case GDK_KEY_KP_Up:
       return NS_VK_UP;
-    case GDK_KP_Down:
+    case GDK_KEY_KP_Down:
       return NS_VK_DOWN;
-    case GDK_KP_Page_Up:
+    case GDK_KEY_KP_Page_Up:
       return NS_VK_PAGE_UP;
     // Not sure what these are
     // case GDK_KP_Prior:              return NS_VK_;
     // case GDK_KP_Next:               return NS_VK_;
-    case GDK_KP_Begin:
+    case GDK_KEY_KP_Begin:
       return NS_VK_CLEAR;  // Num-unlocked 5
-    case GDK_KP_Page_Down:
+    case GDK_KEY_KP_Page_Down:
       return NS_VK_PAGE_DOWN;
-    case GDK_KP_Home:
+    case GDK_KEY_KP_Home:
       return NS_VK_HOME;
-    case GDK_KP_End:
+    case GDK_KEY_KP_End:
       return NS_VK_END;
-    case GDK_KP_Insert:
+    case GDK_KEY_KP_Insert:
       return NS_VK_INSERT;
-    case GDK_KP_Delete:
+    case GDK_KEY_KP_Delete:
       return NS_VK_DELETE;
-    case GDK_KP_Enter:
+    case GDK_KEY_KP_Enter:
       return NS_VK_RETURN;
 
-    case GDK_Num_Lock:
+    case GDK_KEY_Num_Lock:
       return NS_VK_NUM_LOCK;
-    case GDK_Scroll_Lock:
+    case GDK_KEY_Scroll_Lock:
       return NS_VK_SCROLL_LOCK;
 
     // Function keys
-    case GDK_F1:
+    case GDK_KEY_F1:
       return NS_VK_F1;
-    case GDK_F2:
+    case GDK_KEY_F2:
       return NS_VK_F2;
-    case GDK_F3:
+    case GDK_KEY_F3:
       return NS_VK_F3;
-    case GDK_F4:
+    case GDK_KEY_F4:
       return NS_VK_F4;
-    case GDK_F5:
+    case GDK_KEY_F5:
       return NS_VK_F5;
-    case GDK_F6:
+    case GDK_KEY_F6:
       return NS_VK_F6;
-    case GDK_F7:
+    case GDK_KEY_F7:
       return NS_VK_F7;
-    case GDK_F8:
+    case GDK_KEY_F8:
       return NS_VK_F8;
-    case GDK_F9:
+    case GDK_KEY_F9:
       return NS_VK_F9;
-    case GDK_F10:
+    case GDK_KEY_F10:
       return NS_VK_F10;
-    case GDK_F11:
+    case GDK_KEY_F11:
       return NS_VK_F11;
-    case GDK_F12:
+    case GDK_KEY_F12:
       return NS_VK_F12;
-    case GDK_F13:
+    case GDK_KEY_F13:
       return NS_VK_F13;
-    case GDK_F14:
+    case GDK_KEY_F14:
       return NS_VK_F14;
-    case GDK_F15:
+    case GDK_KEY_F15:
       return NS_VK_F15;
-    case GDK_F16:
+    case GDK_KEY_F16:
       return NS_VK_F16;
-    case GDK_F17:
+    case GDK_KEY_F17:
       return NS_VK_F17;
-    case GDK_F18:
+    case GDK_KEY_F18:
       return NS_VK_F18;
-    case GDK_F19:
+    case GDK_KEY_F19:
       return NS_VK_F19;
-    case GDK_F20:
+    case GDK_KEY_F20:
       return NS_VK_F20;
-    case GDK_F21:
+    case GDK_KEY_F21:
       return NS_VK_F21;
-    case GDK_F22:
+    case GDK_KEY_F22:
       return NS_VK_F22;
-    case GDK_F23:
+    case GDK_KEY_F23:
       return NS_VK_F23;
-    case GDK_F24:
+    case GDK_KEY_F24:
       return NS_VK_F24;
 
     // context menu key, keysym 0xff67, typically keycode 117 on 105-key
     // (Microsoft) x86 keyboards, located between right 'Windows' key and
     // right Ctrl key
-    case GDK_Menu:
+    case GDK_KEY_Menu:
       return NS_VK_CONTEXT_MENU;
-    case GDK_Sleep:
+    case GDK_KEY_Sleep:
       return NS_VK_SLEEP;
 
-    case GDK_3270_Attn:
+    case GDK_KEY_3270_Attn:
       return NS_VK_ATTN;
-    case GDK_3270_CursorSelect:
+    case GDK_KEY_3270_CursorSelect:
       return NS_VK_CRSEL;
-    case GDK_3270_ExSelect:
+    case GDK_KEY_3270_ExSelect:
       return NS_VK_EXSEL;
-    case GDK_3270_EraseEOF:
+    case GDK_KEY_3270_EraseEOF:
       return NS_VK_EREOF;
-    case GDK_3270_Play:
+    case GDK_KEY_3270_Play:
       return NS_VK_PLAY;
     // case GDK_XXX:                   return NS_VK_ZOOM;
-    case GDK_3270_PA1:
+    case GDK_KEY_3270_PA1:
       return NS_VK_PA1;
 
     // map Sun Keyboard special keysyms on to NS_VK keys
@@ -2495,12 +2521,12 @@ uint32_t KeymapWrapper::GetDOMKeyCodeFromKeyPairs(guint aGdkKeyval) {
 }
 
 void KeymapWrapper::WillDispatchKeyboardEvent(WidgetKeyboardEvent& aKeyEvent,
-                                              GdkEventKey* aGdkKeyEvent) {
+                                              GdkKeyEvent* aGdkKeyEvent) {
   GetInstance()->WillDispatchKeyboardEventInternal(aKeyEvent, aGdkKeyEvent);
 }
 
 void KeymapWrapper::WillDispatchKeyboardEventInternal(
-    WidgetKeyboardEvent& aKeyEvent, GdkEventKey* aGdkKeyEvent) {
+    WidgetKeyboardEvent& aKeyEvent, GdkKeyEvent* aGdkKeyEvent) {
   if (!aGdkKeyEvent) {
     // If aGdkKeyEvent is nullptr, we're trying to dispatch a fake keyboard
     // event in such case, we don't need to set alternative char codes.
@@ -2532,8 +2558,8 @@ void KeymapWrapper::WillDispatchKeyboardEventInternal(
              this, aKeyEvent.mKeyCode, aKeyEvent.mCharCode, level));
     return;
   }
-
-  guint baseState = aGdkKeyEvent->state &
+  GdkModifierType state = gdk_event_get_modifier_state(GDK_EVENT(aGdkKeyEvent));
+  guint baseState = state &
                     ~(GetGdkModifierMask(SHIFT) | GetGdkModifierMask(CTRL) |
                       GetGdkModifierMask(ALT) | GetGdkModifierMask(META) |
                       GetGdkModifierMask(SUPER) | GetGdkModifierMask(HYPER));
@@ -2544,11 +2570,11 @@ void KeymapWrapper::WillDispatchKeyboardEventInternal(
   AlternativeCharCode altCharCodes(0, 0);
   // unshifted charcode of current keyboard layout.
   altCharCodes.mUnshiftedCharCode =
-      GetCharCodeFor(aGdkKeyEvent, baseState, aGdkKeyEvent->group);
+      GetCharCodeFor(aGdkKeyEvent, baseState);
   bool isLatin = (altCharCodes.mUnshiftedCharCode <= 0xFF);
   // shifted charcode of current keyboard layout.
   altCharCodes.mShiftedCharCode = GetCharCodeFor(
-      aGdkKeyEvent, baseState | GetGdkModifierMask(SHIFT), aGdkKeyEvent->group);
+      aGdkKeyEvent, baseState | GetGdkModifierMask(SHIFT));
   isLatin = isLatin && (altCharCodes.mShiftedCharCode <= 0xFF);
   if (altCharCodes.mUnshiftedCharCode || altCharCodes.mShiftedCharCode) {
     aKeyEvent.mAlternativeCharCodes.AppendElement(altCharCodes);
@@ -2592,12 +2618,11 @@ void KeymapWrapper::WillDispatchKeyboardEventInternal(
                                               : altCharCodes.mUnshiftedCharCode;
 
   // unshifted charcode of found keyboard layout.
-  uint32_t ch = GetCharCodeFor(aGdkKeyEvent, baseState, minGroup);
+  uint32_t ch = GetCharCodeFor(aGdkKeyEvent, baseState);
   altLatinCharCodes.mUnshiftedCharCode =
       IsBasicLatinLetterOrNumeral(ch) ? ch : 0;
   // shifted charcode of found keyboard layout.
-  ch = GetCharCodeFor(aGdkKeyEvent, baseState | GetGdkModifierMask(SHIFT),
-                      minGroup);
+  ch = GetCharCodeFor(aGdkKeyEvent, baseState | GetGdkModifierMask(SHIFT));
   altLatinCharCodes.mShiftedCharCode = IsBasicLatinLetterOrNumeral(ch) ? ch : 0;
   if (altLatinCharCodes.mUnshiftedCharCode ||
       altLatinCharCodes.mShiftedCharCode) {
