@@ -61,7 +61,7 @@ EXPORTS.mozilla.widget += [
 ]
 
 UNIFIED_SOURCES += [
-    "AsyncGtkClipboardRequest.cpp",
+    #"AsyncGtkClipboardRequest.cpp",
     "CompositorWidgetChild.cpp",
     "CompositorWidgetParent.cpp",
     "DMABufLibWrapper.cpp",
@@ -79,10 +79,10 @@ UNIFIED_SOURCES += [
     "nsApplicationChooser.cpp",
     "nsAppShell.cpp",
     "nsBidiKeyboard.cpp",
-    "nsClipboard.cpp",
-    "nsColorPicker.cpp",
-    "nsDragService.cpp",
-    "nsFilePicker.cpp",
+    #"nsClipboard.cpp",
+    #"nsColorPicker.cpp",
+    #"nsDragService.cpp",
+    #"nsFilePicker.cpp",
     "nsGtkKeyUtils.cpp",
     "nsImageToPixbuf.cpp",
     "nsLookAndFeel.cpp",
