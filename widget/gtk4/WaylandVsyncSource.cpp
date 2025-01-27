@@ -17,7 +17,7 @@
 #  include "mozilla/StaticPrefs_widget.h"
 #  include "nsWindow.h"
 
-#  include <gdk/gdkwayland.h>
+#  include <gdk/wayland/gdkwayland.h>
 
 #  ifdef MOZ_LOGGING
 #    include "mozilla/Logging.h"
