@@ -12,7 +12,7 @@
 #  include "X11UndefineNone.h"
 #endif /* MOZ_X11 */
 #ifdef MOZ_WAYLAND
-#  include <gdk/gdkwayland.h>
+#  include <gdk/wayland/gdkwayland.h>
 #endif /* MOZ_WAYLAND */
 #include <dlfcn.h>
 #include <gtk/gtk.h>
@@ -58,34 +58,37 @@ class ScreenGetterGtk final {
   void RefreshScreens();
 
  private:
-  GdkWindow* mRootWindow = nullptr;
+  GdkSurface* mRootWindow = nullptr;
 #ifdef MOZ_X11
   Atom mNetWorkareaAtom = 0;
 #endif
 };
 
 static GdkMonitor* GdkDisplayGetMonitor(GdkDisplay* aDisplay, int aMonitorNum) {
-  static auto s_gdk_display_get_monitor = (GdkMonitor * (*)(GdkDisplay*, int))
-      dlsym(RTLD_DEFAULT, "gdk_display_get_monitor");
-  if (!s_gdk_display_get_monitor) {
+  //static auto s_gdk_display_get_monitor = (GdkMonitor * (*)(GdkDisplay*, int))
+  //    dlsym(RTLD_DEFAULT, "gdk_display_get_monitor");
+  GdkDisplay* display = gdk_display_get_default();
+  GListModel* monitors = gdk_display_get_monitors(display);
+  void* monitor = g_list_model_get_item(monitors, aMonitorNum);
+  if (!monitor) {
     return nullptr;
   }
-  return s_gdk_display_get_monitor(aDisplay, aMonitorNum);
+  return GDK_MONITOR(monitor);
 }
 
 RefPtr<Screen> ScreenHelperGTK::GetScreenForWindow(nsWindow* aWindow) {
   LOG_SCREEN("GetScreenForWindow() [%p]", aWindow);
 
   static auto s_gdk_display_get_monitor_at_window =
-      (GdkMonitor * (*)(GdkDisplay*, GdkWindow*))
-          dlsym(RTLD_DEFAULT, "gdk_display_get_monitor_at_window");
+      (GdkMonitor * (*)(GdkDisplay*, GdkSurface*))
+          dlsym(RTLD_DEFAULT, "gdk_display_get_monitor_at_surface");
 
   if (!s_gdk_display_get_monitor_at_window) {
     LOG_SCREEN("  failed, missing Gtk helpers");
     return nullptr;
   }
 
-  GdkWindow* gdkWindow = aWindow->GetToplevelGdkWindow();
+  GdkSurface* gdkWindow = aWindow->GetToplevelGdkWindow();
   if (!gdkWindow) {
     LOG_SCREEN("  failed, can't get GdkWindow");
     return nullptr;
@@ -112,17 +115,18 @@ RefPtr<Screen> ScreenHelperGTK::GetScreenForWindow(nsWindow* aWindow) {
 
 static StaticAutoPtr<ScreenGetterGtk> gScreenGetter;
 
-static void monitors_changed(GdkScreen* aScreen, gpointer aClosure) {
+static void monitors_changed(GdkDisplay* aDisplay, gpointer aClosure) {
   LOG_SCREEN("Received monitors-changed event");
   auto* self = static_cast<ScreenGetterGtk*>(aClosure);
   self->RefreshScreens();
 }
 
-static void screen_resolution_changed(GdkScreen* aScreen, GParamSpec* aPspec,
+static void screen_resolution_changed(GdkDisplay* aDisplay, GParamSpec* aPspec,
                                       ScreenGetterGtk* self) {
   self->RefreshScreens();
 }
 
+/*
 static GdkFilterReturn root_window_event_filter(GdkXEvent* aGdkXEvent,
                                                 GdkEvent* aGdkEvent,
                                                 gpointer aClosure) {
@@ -145,32 +149,32 @@ static GdkFilterReturn root_window_event_filter(GdkXEvent* aGdkXEvent,
 
   return GDK_FILTER_CONTINUE;
 }
-
+*/
 void ScreenGetterGtk::Init() {
   LOG_SCREEN("ScreenGetterGtk created");
-  GdkScreen* defaultScreen = gdk_screen_get_default();
-  if (!defaultScreen) {
+  GdkDisplay* display = gdk_display_get_default();
+  if (!display) {
     // Sometimes we don't initial X (e.g., xpcshell)
     MOZ_LOG(sScreenLog, LogLevel::Debug,
-            ("defaultScreen is nullptr, running headless"));
+            ("Default display is nullptr, running headless"));
     return;
   }
-  mRootWindow = gdk_get_default_root_window();
-  MOZ_ASSERT(mRootWindow);
+  //mRootWindow = gdk_get_default_root_window();
+  //MOZ_ASSERT(mRootWindow);
 
-  g_object_ref(mRootWindow);
+  //g_object_ref(mRootWindow);
 
   // GDK_PROPERTY_CHANGE_MASK ==> PropertyChangeMask, for PropertyNotify
-  gdk_window_set_events(mRootWindow,
-                        GdkEventMask(gdk_window_get_events(mRootWindow) |
-                                     GDK_PROPERTY_CHANGE_MASK));
+  //gdk_window_set_events(mRootWindow,
+  //                      GdkEventMask(gdk_window_get_events(mRootWindow) |
+  //                                   GDK_PROPERTY_CHANGE_MASK));
 
-  g_signal_connect(defaultScreen, "monitors-changed",
-                   G_CALLBACK(monitors_changed), this);
+  //g_signal_connect(defaultScreen, "monitors-changed",
+  //                 G_CALLBACK(monitors_changed), this);
   // Use _after to ensure this callback is run after gfxPlatformGtk.cpp's
   // handler.
-  g_signal_connect_after(defaultScreen, "notify::resolution",
-                         G_CALLBACK(screen_resolution_changed), this);
+  //g_signal_connect_after(defaultScreen, "notify::resolution",
+  //                       G_CALLBACK(screen_resolution_changed), this);
 #ifdef MOZ_X11
   gdk_window_add_filter(mRootWindow, root_window_event_filter, this);
   if (GdkIsX11Display()) {
@@ -183,20 +187,20 @@ void ScreenGetterGtk::Init() {
 
 ScreenGetterGtk::~ScreenGetterGtk() {
   if (mRootWindow) {
-    g_signal_handlers_disconnect_by_data(gdk_screen_get_default(), this);
+    //g_signal_handlers_disconnect_by_data(gdk_screen_get_default(), this);
 
-    gdk_window_remove_filter(mRootWindow, root_window_event_filter, this);
+    //gdk_window_remove_filter(mRootWindow, root_window_event_filter, this);
     g_object_unref(mRootWindow);
     mRootWindow = nullptr;
   }
 }
 
 static uint32_t GetGTKPixelDepth() {
-  GdkVisual* visual = gdk_screen_get_system_visual(gdk_screen_get_default());
-  return gdk_visual_get_depth(visual);
+  uint32_t depth = 32;
+  return depth;
 }
 
-static already_AddRefed<Screen> MakeScreenGtk(GdkScreen* aScreen,
+static already_AddRefed<Screen> MakeScreenGtk(GdkDisplay* aDisplay,
                                               gint aMonitorNum) {
   gint gdkScaleFactor = ScreenHelperGTK::GetGTKMonitorScaleFactor(aMonitorNum);
 
@@ -223,7 +227,9 @@ static already_AddRefed<Screen> MakeScreenGtk(GdkScreen* aScreen,
   }();
 
   GdkRectangle workarea;
-  gdk_screen_get_monitor_workarea(aScreen, aMonitorNum, &workarea);
+  GdkDisplay* display = gdk_display_get_default();
+  GdkMonitor* aMonitor = GdkDisplayGetMonitor(display, aMonitorNum);
+  gdk_monitor_get_geometry(aMonitor, &workarea);
   LayoutDeviceIntRect availRect(workarea.x * geometryScaleFactor,
                                 workarea.y * geometryScaleFactor,
                                 workarea.width * geometryScaleFactor,
@@ -232,7 +238,7 @@ static already_AddRefed<Screen> MakeScreenGtk(GdkScreen* aScreen,
   DesktopToLayoutDeviceScale contentsScale(1.0);
   if (GdkIsX11Display()) {
     GdkRectangle monitor;
-    gdk_screen_get_monitor_geometry(aScreen, aMonitorNum, &monitor);
+    //gdk_screen_get_monitor_geometry(aScreen, aMonitorNum, &monitor);
     rect = LayoutDeviceIntRect(monitor.x * geometryScaleFactor,
                                monitor.y * geometryScaleFactor,
                                monitor.width * geometryScaleFactor,
@@ -257,7 +263,7 @@ static already_AddRefed<Screen> MakeScreenGtk(GdkScreen* aScreen,
   CSSToLayoutDeviceScale defaultCssScale(gdkScaleFactor);
 
   float dpi = 96.0f;
-  gint heightMM = gdk_screen_get_monitor_height_mm(aScreen, aMonitorNum);
+  gint heightMM = gdk_monitor_get_height_mm(aMonitor);
   if (heightMM > 0) {
     dpi = rect.height / (heightMM / MM_PER_INCH_FLOAT);
   }
@@ -283,12 +289,12 @@ void ScreenGetterGtk::RefreshScreens() {
   LOG_SCREEN("ScreenGetterGtk::RefreshScreens()");
   AutoTArray<RefPtr<Screen>, 4> screenList;
 
-  GdkScreen* defaultScreen = gdk_screen_get_default();
-  gint numScreens = gdk_screen_get_n_monitors(defaultScreen);
-  LOG_SCREEN("GDK reports %d screens", numScreens);
+  GdkDisplay* defaultDisplay = gdk_display_get_default();
+  gint n_monitors = ScreenHelperGTK::GetMonitorCount();
+  LOG_SCREEN("GDK reports %d monitors", n_monitors);
 
-  for (gint i = 0; i < numScreens; i++) {
-    screenList.AppendElement(MakeScreenGtk(defaultScreen, i));
+  for (gint i = 0; i < n_monitors; i++) {
+    screenList.AppendElement(MakeScreenGtk(defaultDisplay, i));
   }
 
   ScreenManager::Refresh(std::move(screenList));
@@ -296,9 +302,10 @@ void ScreenGetterGtk::RefreshScreens() {
 
 gint ScreenHelperGTK::GetGTKMonitorScaleFactor(gint aMonitorNum) {
   MOZ_ASSERT(NS_IsMainThread());
-  GdkScreen* screen = gdk_screen_get_default();
-  return aMonitorNum < gdk_screen_get_n_monitors(screen)
-             ? gdk_screen_get_monitor_scale_factor(screen, aMonitorNum)
+  GdkDisplay* display = gdk_display_get_default();
+  GdkMonitor* monitor = GdkDisplayGetMonitor(display, aMonitorNum);
+  return aMonitorNum < GetMonitorCount()
+             ? gdk_monitor_get_scale_factor(monitor)
              : 1;
 }
 
@@ -308,7 +315,10 @@ ScreenHelperGTK::ScreenHelperGTK() {
 }
 
 int ScreenHelperGTK::GetMonitorCount() {
-  return gdk_screen_get_n_monitors(gdk_screen_get_default());
+  GdkDisplay* display = gdk_display_get_default();
+  GListModel* monitors = gdk_display_get_monitors(display);
+  guint n_monitors = g_list_model_get_n_items(monitors);
+  return n_monitors;
 }
 
 ScreenHelperGTK::~ScreenHelperGTK() { gScreenGetter = nullptr; }
