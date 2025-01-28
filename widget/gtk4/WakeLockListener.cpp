@@ -664,8 +664,8 @@ bool WakeLockTopic::InhibitWaylandIdle() {
 
   UninhibitWaylandIdle();
 
-  if (GdkWindow* window = focusedWindow->GetGdkWindow()) {
-    wl_surface* waylandSurface = gdk_wayland_window_get_wl_surface(window);
+  if (GdkSurface* window = focusedWindow->GetGdkWindow()) {
+    wl_surface* waylandSurface = gdk_wayland_surface_get_wl_surface(window);
     if (waylandSurface) {
       mWaylandInhibitor = zwp_idle_inhibit_manager_v1_create_inhibitor(
           waylandDisplay->GetIdleInhibitManager(), waylandSurface);
