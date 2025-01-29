@@ -105,7 +105,7 @@ void nsApplicationChooser::Done(GtkWidget* chooser, gint response) {
   // A "response" signal won't be sent again but "destroy" will be.
   g_signal_handlers_disconnect_by_func(chooser, FuncToGpointer(OnDestroy),
                                        this);
-  gtk_widget_destroy(chooser);
+  g_object_unref(chooser);
 
   if (mCallback) {
     mCallback->Done(gioHandler);
