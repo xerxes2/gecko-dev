@@ -56,9 +56,9 @@ nsAutoCString WaylandSurface::GetDebugTag() const {
 #endif
 
 void (*WaylandSurface::sGdkWaylandWindowAddCallbackSurface)(
-    GdkWindow*, struct wl_surface*) = nullptr;
+    GdkSurface*, struct wl_surface*) = nullptr;
 void (*WaylandSurface::sGdkWaylandWindowRemoveCallbackSurface)(
-    GdkWindow*, struct wl_surface*) = nullptr;
+    GdkSurface*, struct wl_surface*) = nullptr;
 
 bool WaylandSurface::IsOpaqueRegionEnabled() {
   static bool sIsOpaqueRegionEnabled = []() {
@@ -66,10 +66,10 @@ bool WaylandSurface::IsOpaqueRegionEnabled() {
       return false;
     }
     sGdkWaylandWindowAddCallbackSurface =
-        reinterpret_cast<void (*)(GdkWindow*, struct wl_surface*)>(dlsym(
+        reinterpret_cast<void (*)(GdkSurface*, struct wl_surface*)>(dlsym(
             RTLD_DEFAULT, "gdk_wayland_window_add_frame_callback_surface"));
     sGdkWaylandWindowRemoveCallbackSurface =
-        reinterpret_cast<void (*)(GdkWindow*, struct wl_surface*)>(dlsym(
+        reinterpret_cast<void (*)(GdkSurface*, struct wl_surface*)>(dlsym(
             RTLD_DEFAULT, "gdk_wayland_window_remove_frame_callback_surface"));
     return sGdkWaylandWindowAddCallbackSurface &&
            sGdkWaylandWindowRemoveCallbackSurface;
@@ -909,7 +909,7 @@ void WaylandSurface::AfterPaintHandler(GdkFrameClock* aClock, void* aData) {
 }
 
 bool WaylandSurface::AddOpaqueSurfaceHandlerLocked(
-    const WaylandSurfaceLock& aProofOfLock, GdkWindow* aGdkWindow,
+    const WaylandSurfaceLock& aProofOfLock, GdkSurface* aGdkWindow,
     bool aRegisterCommitHandler) {
   if (!IsOpaqueRegionEnabled() || mIsOpaqueSurfaceHandlerSet) {
     return false;
@@ -928,7 +928,7 @@ bool WaylandSurface::AddOpaqueSurfaceHandlerLocked(
   if (aRegisterCommitHandler) {
     MOZ_DIAGNOSTIC_ASSERT(!mGdkAfterPaintId);
     mGdkAfterPaintId = g_signal_connect_after(
-        gdk_window_get_frame_clock(mGdkWindow), "after-paint",
+        gdk_surface_get_frame_clock(mGdkWindow), "after-paint",
         G_CALLBACK(WaylandSurface::AfterPaintHandler), this);
   }
 
@@ -948,7 +948,7 @@ bool WaylandSurface::RemoveOpaqueSurfaceHandlerLocked(
     mIsOpaqueSurfaceHandlerSet = false;
   }
   if (mGdkAfterPaintId) {
-    GdkFrameClock* frameClock = gdk_window_get_frame_clock(mGdkWindow);
+    GdkFrameClock* frameClock = gdk_surface_get_frame_clock(mGdkWindow);
     // If we're already unmapped frameClock is nullptr
     if (frameClock) {
       g_signal_handler_disconnect(frameClock, mGdkAfterPaintId);
@@ -1195,7 +1195,7 @@ void WaylandSurface::SetTransformFlippedLocked(
   }
 }
 
-GdkWindow* WaylandSurface::GetGdkWindow() const {
+GdkSurface* WaylandSurface::GetGdkWindow() const {
   // Gdk/Gtk code is used on main thread only
   AssertIsOnMainThread();
   return mGdkWindow;
