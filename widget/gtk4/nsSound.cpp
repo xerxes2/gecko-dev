@@ -344,7 +344,9 @@ NS_IMETHODIMP nsSound::OnStreamComplete(nsIStreamLoader* aLoader,
 }
 
 NS_IMETHODIMP nsSound::Beep() {
-  ::gdk_beep();
+  GdkDisplay* display = gdk_display_get_default();
+  gdk_display_beep(display);
+  //::gdk_beep();
   return NS_OK;
 }
 
