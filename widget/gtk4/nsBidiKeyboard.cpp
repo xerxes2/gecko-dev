@@ -24,8 +24,11 @@ nsBidiKeyboard::Reset() {
   GdkDisplay* display = gdk_display_get_default();
   if (!display) return NS_OK;
 
-  GdkKeymap* keymap = gdk_keymap_get_for_display(display);
-  mHaveBidiKeyboards = keymap && gdk_keymap_have_bidi_layouts(keymap);
+  GdkSeat* seat = gdk_display_get_default_seat(display);
+  if (!seat) return NS_OK;
+
+  GdkDevice* keyboard = gdk_seat_get_keyboard(seat);
+  mHaveBidiKeyboards = keyboard && gdk_device_has_bidi_layouts(keyboard);
   return NS_OK;
 }
 
@@ -35,7 +38,15 @@ NS_IMETHODIMP
 nsBidiKeyboard::IsLangRTL(bool* aIsRTL) {
   if (!mHaveBidiKeyboards) return NS_ERROR_FAILURE;
 
-  *aIsRTL = (gdk_keymap_get_direction(gdk_keymap_get_default()) ==
+  GdkDisplay* display = gdk_display_get_default();
+  if (!display) return NS_ERROR_FAILURE;
+
+  GdkSeat* seat = gdk_display_get_default_seat(display);
+  if (!seat) return NS_ERROR_FAILURE;
+
+  GdkDevice* keyboard = gdk_seat_get_keyboard(seat);
+
+  *aIsRTL = (gdk_device_get_direction(keyboard) ==
              PANGO_DIRECTION_RTL);
 
   return NS_OK;
