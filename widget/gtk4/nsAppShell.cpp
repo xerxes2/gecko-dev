@@ -375,7 +375,7 @@ nsresult nsAppShell::Init() {
       screenManager.SetHelper(mozilla::MakeUnique<ScreenHelperGTK>());
     }
 
-    if (gtk_check_version(3, 16, 3) == nullptr) {
+    //if (gtk_check_version(3, 16, 3) == nullptr) {
       // Before 3.16.3, GDK cannot override classname by --class command line
       // option when program uses gdk_set_program_class().
       //
@@ -383,10 +383,10 @@ nsresult nsAppShell::Init() {
       //
       // Only bother doing this for the parent process, since it's the one
       // creating top-level windows.
-      if (gAppData) {
-        gdk_set_program_class(gAppData->remotingName);
-      }
-    }
+    //  if (gAppData) {
+     //   gdk_set_program_class(gAppData->remotingName);
+     // }
+    //}
   }
 
   if (!sPendingResumeQuark &&
