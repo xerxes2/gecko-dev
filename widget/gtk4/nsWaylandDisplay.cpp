@@ -71,8 +71,8 @@ class WaylandPointerEvent {
     if (!aSurface) {
       mWindow = nullptr;
     } else {
-      GdkWindow* window =
-          static_cast<GdkWindow*>(wl_surface_get_user_data(aSurface));
+      GdkSurface* window =
+          static_cast<GdkSurface*>(wl_surface_get_user_data(aSurface));
       mWindow = window ? static_cast<nsWindow*>(
                              g_object_get_data(G_OBJECT(window), "nsWindow"))
                        : nullptr;
