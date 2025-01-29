@@ -39,8 +39,9 @@ static inline const char* ToChar(bool aBool) {
   return aBool ? "true" : "false";
 }
 
-static const char* GetEventType(GdkEventKey* aKeyEvent) {
-  switch (aKeyEvent->type) {
+static const char* GetEventType(GdkKeyEvent* aKeyEvent) {
+  GdkEventType type = gdk_event_get_event_type(GDK_EVENT(aKeyEvent));
+  switch (type) {
     case GDK_KEY_PRESS:
       return "GDK_KEY_PRESS";
     case GDK_KEY_RELEASE:
@@ -61,6 +62,7 @@ class GetEventStateName : public nsAutoCString {
     if (aState & GDK_CONTROL_MASK) {
       AppendModifier("control");
     }
+    /*
     if (aState & GDK_MOD1_MASK) {
       AppendModifier("mod1");
     }
@@ -79,6 +81,7 @@ class GetEventStateName : public nsAutoCString {
     if (aState & GDK_MOD4_MASK) {
       AppendModifier("mod5");
     }
+    */
     switch (aIMContextID) {
       case IMContextWrapper::IMContextID::IBus:
         static const guint IBUS_HANDLED_MASK = 1 << 24;
@@ -279,7 +282,7 @@ class SelectionStyleProvider final {
       style.AppendPrintf(");");
     }
     style.AppendLiteral("}");
-    gtk_css_provider_load_from_data(mProvider, style.get(), -1, nullptr);
+    gtk_css_provider_load_from_data(mProvider, style.get(), -1);
   }
 
  private:
@@ -419,7 +422,9 @@ nsDependentCSubstring IMContextWrapper::GetIMName() const {
 void IMContextWrapper::Init() {
   MozContainer* container = mOwnerWindow->GetMozContainer();
   MOZ_ASSERT(container, "container is null");
-  GdkWindow* gdkWindow = gtk_widget_get_window(GTK_WIDGET(container));
+  //GdkSurface* gdkWindow = gtk_widget_get_window(GTK_WIDGET(container));
+  GtkNative* native = gtk_widget_get_native(container)
+  GdkSurface* gdkWindow = gtk_native_get_surface(native)
 
   // Overwrite selection colors of the window before associating the window
   // with IM context since IME may look up selection colors via IM context
