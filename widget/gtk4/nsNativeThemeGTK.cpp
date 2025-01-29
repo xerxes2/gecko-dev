@@ -237,12 +237,12 @@ bool nsNativeThemeGTK::GetGtkWidgetAndState(StyleAppearance aAppearance,
 
   switch (aAppearance) {
     case StyleAppearance::Button:
-      if (aWidgetFlags) *aWidgetFlags = GTK_RELIEF_NORMAL;
+      //if (aWidgetFlags) *aWidgetFlags = GTK_RELIEF_NORMAL;
       aGtkWidgetType = MOZ_GTK_BUTTON;
       break;
     case StyleAppearance::Toolbarbutton:
     case StyleAppearance::Dualbutton:
-      if (aWidgetFlags) *aWidgetFlags = GTK_RELIEF_NONE;
+      //if (aWidgetFlags) *aWidgetFlags = GTK_RELIEF_NONE;
       aGtkWidgetType = MOZ_GTK_TOOLBAR_BUTTON;
       break;
     case StyleAppearance::Checkbox:
@@ -725,7 +725,7 @@ nsNativeThemeGTK::DrawWidgetBackground(gfxContext* aContext, nsIFrame* aFrame,
   bool safeState = IsWidgetStateSafe(mSafeWidgetStates, aAppearance, &state);
   if (!safeState) {
     gLastGdkError = 0;
-    gdk_error_trap_push();
+    //gdk_error_trap_push();
   }
 
   Transparency transparency = GetWidgetTransparency(aFrame, aAppearance);
@@ -753,10 +753,12 @@ nsNativeThemeGTK::DrawWidgetBackground(gfxContext* aContext, nsIFrame* aFrame,
   if (!safeState) {
     // gdk_flush() call from expose event crashes Gtk+ on Wayland
     // (Gnome BZ #773307)
+    #ifdef MOZ_X11
     if (GdkIsX11Display()) {
       gdk_flush();
     }
-    gLastGdkError = gdk_error_trap_pop();
+    #endif
+    bool gLastGdkError = false;
 
     if (gLastGdkError) {
 #ifdef DEBUG
