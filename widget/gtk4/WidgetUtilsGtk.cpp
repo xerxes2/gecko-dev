@@ -54,14 +54,10 @@ int32_t WidgetUtilsGTK::IsTouchDeviceSupportPresent() {
   if (!display) {
     return 0;
   }
-
-  GdkDeviceManager* manager = gdk_display_get_device_manager(display);
-  if (!manager) {
-    return 0;
-  }
-
+  /* GdkDeviceManager* manager = gdk_display_get_device_manager(display);
+  
   GList* devices =
-      gdk_device_manager_list_devices(manager, GDK_DEVICE_TYPE_SLAVE);
+     gdk_device_manager_list_devices(manager, GDK_DEVICE_TYPE_SLAVE);
   GList* list = devices;
 
   while (devices) {
@@ -75,8 +71,18 @@ int32_t WidgetUtilsGTK::IsTouchDeviceSupportPresent() {
 
   if (list) {
     g_list_free(list);
+  } */
+  GdkSeat* seat = gdk_display_get_default_seat(display);
+  if (!seat) {
+    return 0;
   }
-
+  GdkSeatCapabilities seatCaps = gdk_seat_get_capabilities(seat);
+  GFlagsValue* value = g_flags_get_first_value(G_FLAGS_CLASS(&seatCaps), GDK_SEAT_CAPABILITY_TOUCH);
+  if (value) {
+    result = 1;
+    g_type_class_unref(value);
+  }
+  g_object_unref(&seatCaps);
   return result;
 }
 
@@ -125,14 +131,15 @@ bool GdkIsX11Display() {
 
 GdkDevice* GdkGetPointer() {
   GdkDisplay* display = gdk_display_get_default();
-  GdkDeviceManager* deviceManager = gdk_display_get_device_manager(display);
-  return gdk_device_manager_get_client_pointer(deviceManager);
+  GdkSeat* seat = gdk_display_get_default_seat(display);
+  return gdk_seat_get_pointer(seat);
 }
 
 static GdkEvent* sLastMousePressEvent = nullptr;
 GdkEvent* GetLastMousePressEvent() { return sLastMousePressEvent; }
 
 void SetLastMousePressEvent(GdkEvent* aEvent) {
+  /*
   if (sLastMousePressEvent) {
     GUniquePtr<GdkEvent> event(sLastMousePressEvent);
     sLastMousePressEvent = nullptr;
@@ -142,6 +149,7 @@ void SetLastMousePressEvent(GdkEvent* aEvent) {
   }
   GUniquePtr<GdkEvent> event(gdk_event_copy(aEvent));
   sLastMousePressEvent = event.release();
+  */
 }
 
 bool IsRunningUnderSnap() { return !!GetSnapInstanceName(); }
@@ -336,11 +344,11 @@ RefPtr<FocusRequestPromise> RequestWaylandFocusPromise() {
     return nullptr;
   }
 
-  GdkWindow* gdkWindow = sourceWindow->GetToplevelGdkWindow();
+  GdkSurface* gdkWindow = sourceWindow->GetToplevelGdkWindow();
   if (!gdkWindow) {
     return nullptr;
   }
-  wl_surface* surface = gdk_wayland_window_get_wl_surface(gdkWindow);
+  wl_surface* surface = gdk_wayland_surface_get_wl_surface(gdkWindow);
   if (focusSurface != surface) {
     LOGW("RequestWaylandFocusPromise() missing wl_surface");
     return nullptr;
