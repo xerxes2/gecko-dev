@@ -109,7 +109,7 @@ SOURCES += [
 if CONFIG["MOZ_WAYLAND"]:
     UNIFIED_SOURCES += [
         "MozContainerWayland.cpp",
-        "nsClipboardWayland.cpp",
+        #"nsClipboardWayland.cpp",
         "nsWaylandDisplay.cpp",
         "WaylandBuffer.cpp",
         "WaylandSurface.cpp",
