@@ -236,14 +236,15 @@ class SelectionStyleProvider final {
   }
 
   // aGDKWindow is a GTK window which will be associated with an IM context.
-  void AttachTo(GdkWindow* aGDKWindow) {
-    GtkWidget* widget = nullptr;
+  void AttachTo(GdkSurface* aGDKWindow) {
+    //GtkWidget* widget = nullptr;
     // gdk_window_get_user_data() typically returns pointer to widget that
     // window belongs to.  If it's widget, fcitx retrieves selection colors
     // of them.  So, we need to overwrite its style.
-    gdk_window_get_user_data(aGDKWindow, (gpointer*)&widget);
-    if (GTK_IS_WIDGET(widget)) {
-      gtk_style_context_add_provider(gtk_widget_get_style_context(widget),
+    //gdk_window_get_user_data(aGDKWindow, (gpointer*)&widget);
+    GdkDisplay* display = gdk_display_get_default();
+    if (display) {
+      gtk_style_context_add_provider_for_display(display,
                                      GTK_STYLE_PROVIDER(mProvider),
                                      GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
     }
@@ -423,8 +424,8 @@ void IMContextWrapper::Init() {
   MozContainer* container = mOwnerWindow->GetMozContainer();
   MOZ_ASSERT(container, "container is null");
   //GdkSurface* gdkWindow = gtk_widget_get_window(GTK_WIDGET(container));
-  GtkNative* native = gtk_widget_get_native(container)
-  GdkSurface* gdkWindow = gtk_native_get_surface(native)
+  GtkNative* native = gtk_widget_get_native(GTK_WIDGET(container));
+  GdkSurface* gdkWindow = gtk_native_get_surface(native);
 
   // Overwrite selection colors of the window before associating the window
   // with IM context since IME may look up selection colors via IM context
@@ -436,7 +437,7 @@ void IMContextWrapper::Init() {
 
   // Normal context.
   mContext = gtk_im_multicontext_new();
-  gtk_im_context_set_client_window(mContext, gdkWindow);
+  gtk_im_context_set_client_widget(mContext, GTK_WIDGET(container));
   g_signal_connect(mContext, "preedit_changed",
                    G_CALLBACK(IMContextWrapper::OnChangeCompositionCallback),
                    this);
@@ -508,7 +509,7 @@ void IMContextWrapper::Init() {
   // Simple context
   if (sUseSimpleContext) {
     mSimpleContext = gtk_im_context_simple_new();
-    gtk_im_context_set_client_window(mSimpleContext, gdkWindow);
+    gtk_im_context_set_client_widget(mContext, GTK_WIDGET(container));
     g_signal_connect(mSimpleContext, "preedit_changed",
                      G_CALLBACK(&IMContextWrapper::OnChangeCompositionCallback),
                      this);
@@ -531,7 +532,7 @@ void IMContextWrapper::Init() {
 
   // Dummy context
   mDummyContext = gtk_im_multicontext_new();
-  gtk_im_context_set_client_window(mDummyContext, gdkWindow);
+  gtk_im_context_set_client_widget(mContext, GTK_WIDGET(container));
 
   MOZ_LOG(gIMELog, LogLevel::Info,
           ("0x%p Init(), mOwnerWindow=%p, mContext=%p (im=\"%s\"), "
@@ -602,7 +603,7 @@ IMContextWrapper::WillDispatchKeyboardEvent(
     WidgetKeyboardEvent& aKeyboardEvent, uint32_t aIndexOfKeypress,
     void* aData) {
   KeymapWrapper::WillDispatchKeyboardEvent(aKeyboardEvent,
-                                           static_cast<GdkEventKey*>(aData));
+                                           static_cast<GdkKeyEvent*>(aData));
 }
 
 TextEventDispatcher* IMContextWrapper::GetTextEventDispatcher() {
@@ -662,14 +663,14 @@ void IMContextWrapper::OnDestroyWindow(nsWindow* aWindow) {
    */
   if (mContext) {
     PrepareToDestroyContext(mContext);
-    gtk_im_context_set_client_window(mContext, nullptr);
+    gtk_im_context_set_client_widget(mContext, nullptr);
     g_signal_handlers_disconnect_by_data(mContext, this);
     g_object_unref(mContext);
     mContext = nullptr;
   }
 
   if (mSimpleContext) {
-    gtk_im_context_set_client_window(mSimpleContext, nullptr);
+    gtk_im_context_set_client_widget(mSimpleContext, nullptr);
     g_signal_handlers_disconnect_by_data(mSimpleContext, this);
     g_object_unref(mSimpleContext);
     mSimpleContext = nullptr;
@@ -678,7 +679,7 @@ void IMContextWrapper::OnDestroyWindow(nsWindow* aWindow) {
   if (mDummyContext) {
     // mContext and mDummyContext have the same slaveType and signal_data
     // so no need for another workaround_gtk_im_display_closed.
-    gtk_im_context_set_client_window(mDummyContext, nullptr);
+    gtk_im_context_set_client_widget(mDummyContext, nullptr);
     g_object_unref(mDummyContext);
     mDummyContext = nullptr;
   }
@@ -761,7 +762,7 @@ void IMContextWrapper::OnBlurWindow(nsWindow* aWindow) {
 }
 
 KeyHandlingState IMContextWrapper::OnKeyEvent(
-    nsWindow* aCaller, GdkEventKey* aEvent,
+    nsWindow* aCaller, GdkKeyEvent* aEvent,
     bool aKeyboardEventWasDispatched /* = false */) {
   MOZ_ASSERT(aEvent, "aEvent must be non-null");
 
@@ -777,9 +778,11 @@ KeyHandlingState IMContextWrapper::OnKeyEvent(
        "time=%u, hardware_keycode=%u, group=%u }, "
        "aKeyboardEventWasDispatched=%s)",
        this, aCaller, aEvent, GetEventType(aEvent),
-       gdk_keyval_name(aEvent->keyval), gdk_keyval_to_unicode(aEvent->keyval),
-       GetEventStateName(aEvent->state, mIMContextID).get(), aEvent->time,
-       aEvent->hardware_keycode, aEvent->group,
+       gdk_keyval_name(gdk_key_event_get_keyval(GDK_EVENT(aEvent))),
+       gdk_keyval_to_unicode(gdk_key_event_get_keyval(GDK_EVENT(aEvent))),
+       GetEventStateName(gdk_event_get_modifier_state(GDK_EVENT(aEvent)), mIMContextID).get(),
+       gdk_event_get_time(GDK_EVENT(aEvent)), gdk_key_event_get_keycode(GDK_EVENT(aEvent)),
+       gdk_key_event_get_layout(GDK_EVENT(aEvent)),
        ToChar(aKeyboardEventWasDispatched)));
   MOZ_LOG(
       gIMELog, LogLevel::Info,
@@ -849,7 +852,7 @@ KeyHandlingState IMContextWrapper::OnKeyEvent(
         // If IBUS_IGNORED_MASK was set to aEvent->state, the event
         // has already been handled by another process and it wasn't
         // used by IME.
-        isHandlingAsyncEvent = !!(aEvent->state & IBUS_IGNORED_MASK);
+        isHandlingAsyncEvent = !!(gdk_event_get_modifier_state(GDK_EVENT(aEvent)) & IBUS_IGNORED_MASK);
         if (!isHandlingAsyncEvent) {
           // On some environments, IBUS_IGNORED_MASK flag is not set as
           // expected.  In such case, we keep pusing all events into the queue.
@@ -885,7 +888,7 @@ KeyHandlingState IMContextWrapper::OnKeyEvent(
         }
 
         // ibus won't send back key press events in a dead key sequcne.
-        if (mMaybeInDeadKeySequence && aEvent->type == GDK_KEY_PRESS) {
+        if (mMaybeInDeadKeySequence && gdk_event_get_event_type(GDK_EVENT(aEvent)) == GDK_KEY_PRESS) {
           probablyHandledAsynchronously = false;
           if (isHandlingAsyncEvent) {
             isUnexpectedAsyncEvent = true;
@@ -895,8 +898,8 @@ KeyHandlingState IMContextWrapper::OnKeyEvent(
           // "empty" key event to make us call
           // gtk_im_context_filter_keypress() to commit composed
           // character during a GDK_KEY_PRESS event dispatching.
-          if (!gdk_keyval_to_unicode(aEvent->keyval) &&
-              !aEvent->hardware_keycode) {
+          if (!gdk_keyval_to_unicode(gdk_key_event_get_keyval(GDK_EVENT(aEvent))) &&
+              !gdk_key_event_get_keycode(GDK_EVENT(aEvent))) {
             isUnexpectedAsyncEvent = true;
             break;
           }
@@ -920,7 +923,7 @@ KeyHandlingState IMContextWrapper::OnKeyEvent(
         // If FcitxKeyState_IgnoredMask was set to aEvent->state,
         // the event has already been handled by another process and
         // it wasn't used by IME.
-        isHandlingAsyncEvent = !!(aEvent->state & FcitxKeyState_IgnoredMask);
+        isHandlingAsyncEvent = !!(gdk_event_get_modifier_state(GDK_EVENT(aEvent)) & FcitxKeyState_IgnoredMask);
         if (!isHandlingAsyncEvent) {
           // On some environments, FcitxKeyState_IgnoredMask flag *might* be not
           // set as expected. If there were such cases, we'd keep pusing all
@@ -942,7 +945,7 @@ KeyHandlingState IMContextWrapper::OnKeyEvent(
         }
 
         // fcitx won't send back key press events in a dead key sequcne.
-        if (mMaybeInDeadKeySequence && aEvent->type == GDK_KEY_PRESS) {
+        if (mMaybeInDeadKeySequence && gdk_event_get_event_type(GDK_EVENT(aEvent)) == GDK_KEY_PRESS) {
           probablyHandledAsynchronously = false;
           if (isHandlingAsyncEvent) {
             isUnexpectedAsyncEvent = true;
@@ -952,8 +955,8 @@ KeyHandlingState IMContextWrapper::OnKeyEvent(
           // "empty" key event to make us call
           // gtk_im_context_filter_keypress() to commit composed
           // character during a GDK_KEY_PRESS event dispatching.
-          if (!gdk_keyval_to_unicode(aEvent->keyval) &&
-              !aEvent->hardware_keycode) {
+          if (!gdk_keyval_to_unicode(gdk_key_event_get_keyval(GDK_EVENT(aEvent))) &&
+              !gdk_key_event_get_keycode(GDK_EVENT(aEvent))) {
             isUnexpectedAsyncEvent = true;
             break;
           }
@@ -997,7 +1000,7 @@ KeyHandlingState IMContextWrapper::OnKeyEvent(
   }
   mFallbackToKeyEvent = false;
   mProcessingKeyEvent = aEvent;
-  gboolean isFiltered = gtk_im_context_filter_keypress(currentContext, aEvent);
+  gboolean isFiltered = gtk_im_context_filter_keypress(currentContext, GDK_EVENT(aEvent));
 
   // If we're not sure whether the event is handled by IME asynchronously or
   // synchronously, we need to trust the result of
@@ -1008,9 +1011,9 @@ KeyHandlingState IMContextWrapper::OnKeyEvent(
         isFiltered && !mFallbackToKeyEvent && !mKeyboardEventWasDispatched;
   }
 
-  if (aEvent->type == GDK_KEY_PRESS) {
+  if (gdk_event_get_event_type(GDK_EVENT(aEvent))  == GDK_KEY_PRESS) {
     if (isFiltered && probablyHandledAsynchronously) {
-      sWaitingSynthesizedKeyPressHardwareKeyCode = aEvent->hardware_keycode;
+      sWaitingSynthesizedKeyPressHardwareKeyCode = gdk_key_event_get_keycode(GDK_EVENT(aEvent));
     } else {
       sWaitingSynthesizedKeyPressHardwareKeyCode = 0;
     }
@@ -1021,7 +1024,7 @@ KeyHandlingState IMContextWrapper::OnKeyEvent(
   bool filterThisEvent = isFiltered && !mFallbackToKeyEvent;
 
   if (IsComposingOnCurrentContext() && !isFiltered &&
-      aEvent->type == GDK_KEY_PRESS && mDispatchedCompositionString.IsEmpty()) {
+      gdk_event_get_event_type(GDK_EVENT(aEvent)) == GDK_KEY_PRESS && mDispatchedCompositionString.IsEmpty()) {
     // A Hangul input engine for SCIM doesn't emit preedit_end
     // signal even when composition string becomes empty.  On the
     // other hand, we should allow to make composition with empty
@@ -1061,7 +1064,7 @@ KeyHandlingState IMContextWrapper::OnKeyEvent(
 
   mProcessingKeyEvent = nullptr;
 
-  if (aEvent->type == GDK_KEY_PRESS && !filterThisEvent) {
+  if (gdk_event_get_event_type(GDK_EVENT(aEvent)) == GDK_KEY_PRESS && !filterThisEvent) {
     // If the key event hasn't been handled by active IME nor keyboard
     // layout, we can assume that the dead key sequence has been or was
     // ended.  Note that we should not reset it when the key event is
@@ -1070,8 +1073,8 @@ KeyHandlingState IMContextWrapper::OnKeyEvent(
     mMaybeInDeadKeySequence = false;
   }
 
-  if (aEvent->type == GDK_KEY_RELEASE) {
-    if (const GdkEventKey* pendingKeyPressEvent =
+  if (gdk_event_get_event_type(GDK_EVENT(aEvent)) == GDK_KEY_RELEASE) {
+    if (GdkKeyEvent* pendingKeyPressEvent =
             mPostingKeyEvents.GetCorrespondingKeyPressEvent(aEvent)) {
       MOZ_LOG(gIMELog, LogLevel::Warning,
               ("0x%p   OnKeyEvent(), forgetting a pending GDK_KEY_PRESS event "
@@ -1641,10 +1644,10 @@ void IMContextWrapper::OnStartCompositionNative(GtkIMContext* aContext) {
   // GDK_KEY_PRESS event.  In that case, we should handle composition with
   // emulating the usual case, i.e., this is called in the stack of
   // OnKeyEvent().
-  Maybe<AutoRestore<GdkEventKey*>> maybeRestoreProcessingKeyEvent;
+  Maybe<AutoRestore<GdkKeyEvent*>> maybeRestoreProcessingKeyEvent;
   if (!mProcessingKeyEvent && !mPostingKeyEvents.IsEmpty()) {
-    GdkEventKey* keyEvent = mPostingKeyEvents.GetFirstEvent();
-    if (keyEvent && keyEvent->type == GDK_KEY_PRESS &&
+    GdkKeyEvent* keyEvent = mPostingKeyEvents.GetFirstEvent();
+    if (keyEvent && gdk_event_get_event_type(GDK_EVENT(keyEvent)) == GDK_KEY_PRESS &&
         KeymapWrapper::ComputeDOMKeyNameIndex(keyEvent) ==
             KEY_NAME_INDEX_USE_STRING) {
       maybeRestoreProcessingKeyEvent.emplace(mProcessingKeyEvent);
@@ -1753,10 +1756,10 @@ void IMContextWrapper::OnChangeCompositionNative(GtkIMContext* aContext) {
   // GDK_KEY_PRESS event.  In that case, we should handle composition with
   // emulating the usual case, i.e., this is called in the stack of
   // OnKeyEvent().
-  Maybe<AutoRestore<GdkEventKey*>> maybeRestoreProcessingKeyEvent;
+  Maybe<AutoRestore<GdkKeyEvent*>> maybeRestoreProcessingKeyEvent;
   if (!mProcessingKeyEvent && !mPostingKeyEvents.IsEmpty()) {
-    GdkEventKey* keyEvent = mPostingKeyEvents.GetFirstEvent();
-    if (keyEvent && keyEvent->type == GDK_KEY_PRESS &&
+    GdkKeyEvent* keyEvent = mPostingKeyEvents.GetFirstEvent();
+    if (keyEvent && gdk_event_get_event_type(GDK_EVENT(keyEvent)) == GDK_KEY_PRESS &&
         KeymapWrapper::ComputeDOMKeyNameIndex(keyEvent) ==
             KEY_NAME_INDEX_USE_STRING) {
       maybeRestoreProcessingKeyEvent.emplace(mProcessingKeyEvent);
@@ -1899,10 +1902,10 @@ void IMContextWrapper::OnCommitCompositionNative(GtkIMContext* aContext,
   // GDK_KEY_PRESS event.  In that case, we should handle composition with
   // emulating the usual case, i.e., this is called in the stack of
   // OnKeyEvent().
-  Maybe<AutoRestore<GdkEventKey*>> maybeRestoreProcessingKeyEvent;
+  Maybe<AutoRestore<GdkKeyEvent*>> maybeRestoreProcessingKeyEvent;
   if (!mProcessingKeyEvent && !mPostingKeyEvents.IsEmpty()) {
-    GdkEventKey* keyEvent = mPostingKeyEvents.GetFirstEvent();
-    if (keyEvent && keyEvent->type == GDK_KEY_PRESS &&
+    GdkKeyEvent* keyEvent = mPostingKeyEvents.GetFirstEvent();
+    if (keyEvent && gdk_event_get_event_type(GDK_EVENT(keyEvent)) == GDK_KEY_PRESS &&
         KeymapWrapper::ComputeDOMKeyNameIndex(keyEvent) ==
             KEY_NAME_INDEX_USE_STRING) {
       maybeRestoreProcessingKeyEvent.emplace(mProcessingKeyEvent);
@@ -1946,13 +1949,13 @@ void IMContextWrapper::OnCommitCompositionNative(GtkIMContext* aContext,
   // NOTE: While a key event is being handled, this might be caused on
   // current context.  Otherwise, this may be caused on active context.
   if (!IsComposingOn(aContext) && mProcessingKeyEvent &&
-      mProcessingKeyEvent->type == GDK_KEY_PRESS &&
+      gdk_event_get_event_type(GDK_EVENT(mProcessingKeyEvent)) == GDK_KEY_PRESS &&
       aContext == GetCurrentContext()) {
     char keyval_utf8[8]; /* should have at least 6 bytes of space */
     gint keyval_utf8_len;
     guint32 keyval_unicode;
 
-    keyval_unicode = gdk_keyval_to_unicode(mProcessingKeyEvent->keyval);
+    keyval_unicode = gdk_keyval_to_unicode(gdk_key_event_get_keyval(GDK_EVENT(mProcessingKeyEvent)));
     keyval_utf8_len = g_unichar_to_utf8(keyval_unicode, keyval_utf8);
     keyval_utf8[keyval_utf8_len] = '\0';
 
@@ -2090,7 +2093,7 @@ bool IMContextWrapper::MaybeDispatchKeyEventAsProcessedByIME(
     // sent by IME without sending key event to us.  In such case, we
     // should dispatch keyboard event for the last key event which was
     // posted to other IME process.
-    GdkEventKey* sourceEvent = mProcessingKeyEvent
+    GdkKeyEvent* sourceEvent = mProcessingKeyEvent
                                    ? mProcessingKeyEvent
                                    : mPostingKeyEvents.GetFirstEvent();
 
@@ -2101,12 +2104,14 @@ bool IMContextWrapper::MaybeDispatchKeyEventAsProcessedByIME(
          "event: { type=%s, keyval=%s, unicode=0x%X, state=%s, "
          "time=%u, hardware_keycode=%u, group=%u }",
          this, ToChar(aFollowingEvent),
-         ToChar(sourceEvent->type == GDK_KEY_PRESS ? eKeyDown : eKeyUp),
+         ToChar(gdk_event_get_event_type(GDK_EVENT(sourceEvent)) == GDK_KEY_PRESS ? eKeyDown : eKeyUp),
          mProcessingKeyEvent ? "processing" : "posted",
-         GetEventType(sourceEvent), gdk_keyval_name(sourceEvent->keyval),
-         gdk_keyval_to_unicode(sourceEvent->keyval),
-         GetEventStateName(sourceEvent->state, mIMContextID).get(),
-         sourceEvent->time, sourceEvent->hardware_keycode, sourceEvent->group));
+         GetEventType(sourceEvent), gdk_keyval_name(gdk_key_event_get_keyval(GDK_EVENT(sourceEvent))),
+         gdk_keyval_to_unicode(gdk_key_event_get_keyval(GDK_EVENT(sourceEvent))),
+         GetEventStateName(gdk_event_get_modifier_state(GDK_EVENT(sourceEvent)), mIMContextID).get(),
+         gdk_event_get_time(GDK_EVENT(sourceEvent)),
+         gdk_key_event_get_keycode(GDK_EVENT(sourceEvent)),
+         gdk_key_event_get_layout(GDK_EVENT(sourceEvent))));
 
     // Let's dispatch eKeyDown event or eKeyUp event now.  Note that only
     // when we're not in a dead key composition, we should mark the
