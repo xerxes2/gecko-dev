@@ -272,7 +272,7 @@ class IMContextWrapper final : public TextEventDispatcherListener {
      * Return corresponding GDK_KEY_PRESS event for aEvent.  aEvent must be a
      * GDK_KEY_RELEASE event.
      */
-    const GdkKeyEvent* GetCorrespondingKeyPressEvent(
+    GdkKeyEvent* GetCorrespondingKeyPressEvent(
          GdkKeyEvent* aEvent) const {
       //MOZ_ASSERT(aEvent->type == GDK_KEY_RELEASE);
       MOZ_ASSERT(gdk_event_get_event_type(GDK_EVENT(aEvent)) == GDK_KEY_RELEASE);
