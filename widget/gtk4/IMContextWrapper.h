@@ -266,6 +266,7 @@ class IMContextWrapper final : public TextEventDispatcherListener {
         return;
       }
       mEvents.RemoveElementAt(index);
+      gdk_event_unref(GDK_EVENT(aEvent));
     }
 
     /**
