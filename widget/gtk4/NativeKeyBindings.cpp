@@ -17,7 +17,7 @@
 
 #include <gtk/gtk.h>
 #include <gdk/gdkkeysyms.h>
-#include <gdk/gdkkeysyms-compat.h>
+//#include <gdk/gdkkeysyms-compat.h>
 #include <gdk/gdk.h>
 
 namespace mozilla {
@@ -83,6 +83,7 @@ static void delete_from_cursor_cb(GtkWidget* w, GtkDeleteType del_type,
 
   // Ignore GTK's Ctrl-K keybinding introduced in GTK 3.14 and removed in
   // 3.18 if the user has custom bindings set. See bug 1176929.
+  /*
   if (del_type == GTK_DELETE_PARAGRAPH_ENDS && forward && GTK_IS_ENTRY(w) &&
       !gtk_check_version(3, 14, 1) && gtk_check_version(3, 17, 9)) {
     GtkStyleContext* context = gtk_widget_get_style_context(w);
@@ -92,7 +93,7 @@ static void delete_from_cursor_cb(GtkWidget* w, GtkDeleteType del_type,
     gtk_style_context_get(context, flags, "gtk-key-bindings", &array, nullptr);
     if (!array) return;
     g_ptr_array_unref(array);
-  }
+  }*/
 
   gHandled = true;
   if (uint32_t(del_type) >= std::size(sDeleteCommands)) {
@@ -278,7 +279,7 @@ void NativeKeyBindings::Init(NativeKeyBindingsType aType) {
 }
 
 NativeKeyBindings::~NativeKeyBindings() {
-  gtk_widget_destroy(mNativeTarget);
+  //gtk_widget_destroy(mNativeTarget);
   g_object_unref(mNativeTarget);
 }
 
@@ -303,23 +304,24 @@ void NativeKeyBindings::GetEditCommands(const WidgetKeyboardEvent& aEvent,
         aEvent.GetRemappedKeyCode(aWritingMode.ref());
     switch (remappedGeckoKeyCode) {
       case NS_VK_UP:
-        keyval = GDK_Up;
+        keyval = GDK_KEY_Up;
         break;
       case NS_VK_DOWN:
-        keyval = GDK_Down;
+        keyval = GDK_KEY_Down;
         break;
       case NS_VK_LEFT:
-        keyval = GDK_Left;
+        keyval = GDK_KEY_Left;
         break;
       case NS_VK_RIGHT:
-        keyval = GDK_Right;
+        keyval = GDK_KEY_Right;
         break;
       default:
         MOZ_ASSERT_UNREACHABLE("Add a case for the new remapped key");
         return;
     }
   } else {
-    keyval = static_cast<GdkEventKey*>(aEvent.mNativeKeyEvent)->keyval;
+    //keyval = static_cast<GdkKeyEvent*>(aEvent.mNativeKeyEvent)->keyval;
+    keyval = gdk_key_event_get_keyval(GDK_EVENT(static_cast<GdkKeyEvent*>(aEvent.mNativeKeyEvent)));
   }
 
   if (GetEditCommandsInternal(aEvent, aCommands, keyval)) {
@@ -373,13 +375,16 @@ void NativeKeyBindings::GetEditCommands(const WidgetKeyboardEvent& aEvent,
 bool NativeKeyBindings::GetEditCommandsInternal(
     const WidgetKeyboardEvent& aEvent, nsTArray<CommandInt>& aCommands,
     guint aKeyval) {
-  guint modifiers = static_cast<GdkEventKey*>(aEvent.mNativeKeyEvent)->state;
+  //guint modifiers = static_cast<GdkEventKey*>(aEvent.mNativeKeyEvent)->state;
+  guint modifiers = gdk_event_get_modifier_state(GDK_EVENT(static_cast<GdkKeyEvent*>(aEvent.mNativeKeyEvent)));
+  guint keycode = gdk_key_event_get_keycode(GDK_EVENT(static_cast<GdkKeyEvent*>(aEvent.mNativeKeyEvent)));
 
   gCurrentCommands = &aCommands;
 
   gHandled = false;
-  gtk_bindings_activate(G_OBJECT(mNativeTarget), aKeyval,
-                        GdkModifierType(modifiers));
+  //gtk_bindings_activate(G_OBJECT(mNativeTarget), aKeyval,
+  //  GdkModifierType(modifiers));
+  g_signal_emit_by_name(G_OBJECT(mNativeTarget), "key-pressed", aKeyval, keycode, GdkModifierType(modifiers));
 
   gCurrentCommands = nullptr;
 
