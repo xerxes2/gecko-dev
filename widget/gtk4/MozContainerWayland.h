@@ -51,7 +51,7 @@ struct MozContainerWayland {
 
 void moz_container_wayland_map(GtkWidget*);
 gboolean moz_container_wayland_map_event(GtkWidget*, GdkEvent*);
-void moz_container_wayland_size_allocate(GtkWidget*, GtkAllocation*);
+void moz_container_wayland_size_allocate(GtkWidget*, int, int, int);
 void moz_container_wayland_unmap(GtkWidget*);
 
 struct wl_egl_window* moz_container_wayland_get_egl_window(
