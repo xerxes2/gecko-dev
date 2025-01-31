@@ -88,6 +88,7 @@ static bool moz_container_wayland_ensure_surface(
 // Invalidate gtk wl_surface to commit changes to wl_subsurface.
 // wl_subsurface changes are effective when parent surface is commited.
 static void moz_container_wayland_invalidate(MozContainer* container) {
+  /*
   LOGWAYLAND("moz_container_wayland_invalidate [%p]\n",
              (void*)moz_container_get_nsWindow(container));
 
@@ -97,6 +98,7 @@ static void moz_container_wayland_invalidate(MozContainer* container) {
     return;
   }
   gdk_window_invalidate_rect(window, nullptr, true);
+  */
 }
 
 // This is called from layout/compositor code only with
@@ -138,7 +140,7 @@ void moz_container_wayland_unmap(GtkWidget* widget) {
 }
 
 gboolean moz_container_wayland_map_event(GtkWidget* widget,
-                                         GdkEventAny* event) {
+                                         GdkEvent* event) {
   LOGCONTAINER("%s [%p]\n", __FUNCTION__,
                (void*)moz_container_get_nsWindow(MOZ_CONTAINER(widget)));
 
@@ -179,33 +181,31 @@ gboolean moz_container_wayland_map_event(GtkWidget* widget,
 }
 
 void moz_container_wayland_size_allocate(GtkWidget* widget,
-                                         GtkAllocation* allocation) {
+                                         int width,
+                                         int height,
+                                         int baseline) {
   GtkAllocation tmp_allocation;
 
   g_return_if_fail(IS_MOZ_CONTAINER(widget));
 
-  LOGCONTAINER("moz_container_wayland_size_allocate [%p] %d,%d -> %d x %d\n",
+  LOGCONTAINER("moz_container_wayland_size_allocate [%p] %d x %d\n",
                (void*)moz_container_get_nsWindow(MOZ_CONTAINER(widget)),
-               allocation->x, allocation->y, allocation->width,
-               allocation->height);
+               width, height);
 
   /* short circuit if you can */
   gtk_widget_get_allocation(widget, &tmp_allocation);
-  if (tmp_allocation.x == allocation->x && tmp_allocation.y == allocation->y &&
-      tmp_allocation.width == allocation->width &&
-      tmp_allocation.height == allocation->height) {
+  if (tmp_allocation.width == width && tmp_allocation.height == height) {
     return;
   }
-  gtk_widget_set_allocation(widget, allocation);
+  //gtk_widget_set_allocation(widget, allocation);
 
-  if (gtk_widget_get_has_window(widget) && gtk_widget_get_realized(widget)) {
-    gdk_window_move_resize(gtk_widget_get_window(widget), allocation->x,
-                           allocation->y, allocation->width,
-                           allocation->height);
+  if (gtk_widget_get_realized(widget)) {
+    //gdk_window_move_resize(gtk_widget_get_window(widget), tmp_allocation->width,
+    //                       tmp_allocation->height);
     // We need to position our subsurface according to GdkWindow
     // when offset changes (GdkWindow is maximized for instance).
     // see gtk-clutter-embed.c for reference.
-    gfx::IntPoint position(allocation->x, allocation->y);
+    gfx::IntPoint position(tmp_allocation.x, tmp_allocation.y);
     moz_container_wayland_ensure_surface(MOZ_CONTAINER(widget), &position);
     MOZ_WL_CONTAINER(widget)->before_first_size_alloc = false;
   }
@@ -227,11 +227,12 @@ static bool moz_container_wayland_ensure_surface(MozContainer* container,
 
   LOGWAYLAND("%s [%p]\n", __FUNCTION__,
              (void*)moz_container_get_nsWindow(container));
+  
+  GdkSurface* gdkSurface = gtk_native_get_surface(gtk_widget_get_native(GTK_WIDGET(container)));
+  //GdkSurface* window;
+  MOZ_DIAGNOSTIC_ASSERT(gdkSurface);
 
-  GdkWindow* gdkWindow = gtk_widget_get_window(GTK_WIDGET(container));
-  MOZ_DIAGNOSTIC_ASSERT(gdkWindow);
-
-  wl_surface* parentSurface = gdk_wayland_window_get_wl_surface(gdkWindow);
+  wl_surface* parentSurface = gdk_wayland_surface_get_wl_surface(gdkSurface);
   if (!parentSurface) {
     LOGWAYLAND("    Failed - missing parent surface!");
     return false;
@@ -254,7 +255,7 @@ static bool moz_container_wayland_ensure_surface(MozContainer* container,
     return false;
   }
 
-  surface->AddOpaqueSurfaceHandlerLocked(lock, gdkWindow,
+  surface->AddOpaqueSurfaceHandlerLocked(lock, gdkSurface,
                                          /* aRegisterCommitHandler */ true);
 
   nsWindow* window = moz_container_get_nsWindow(container);
@@ -311,9 +312,9 @@ struct wl_egl_window* moz_container_wayland_get_egl_window(
 
   // TODO: Get size from bounds instead of GdkWindow?
   // We may be in rendering/compositor thread here.
-  GdkWindow* window = gtk_widget_get_window(GTK_WIDGET(container));
-  nsIntSize unscaledSize(gdk_window_get_width(window),
-                         gdk_window_get_height(window));
+  GdkSurface* window = gtk_native_get_surface(gtk_widget_get_native(GTK_WIDGET(container)));
+  nsIntSize unscaledSize(gdk_surface_get_width(window),
+                         gdk_surface_get_height(window));
   return MOZ_WL_SURFACE(container)->GetEGLWindow(unscaledSize);
 }
 
