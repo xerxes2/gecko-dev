@@ -59,7 +59,7 @@ GType moz_container_get_type(void) {
     };
 
     moz_container_type =
-        g_type_register_static(GTK_TYPE_CONTAINER, "MozContainer",
+        g_type_register_static(GTK_TYPE_WIDGET, "MozContainer",
                                &moz_container_info, static_cast<GTypeFlags>(0));
   }
 
@@ -88,16 +88,16 @@ void moz_container_class_init(MozContainerClass* klass) {
   widget_class->map = moz_container_map;
   widget_class->realize = moz_container_realize;
   widget_class->unrealize = moz_container_unrealize;
-  widget_class->destroy = moz_container_destroy;
+  //widget_class->destroy = moz_container_destroy;
 
 #ifdef MOZ_WAYLAND
   if (mozilla::widget::GdkIsWaylandDisplay()) {
     widget_class->size_allocate = moz_container_wayland_size_allocate;
-    widget_class->map_event = moz_container_wayland_map_event;
+    //widget_class->map_event = moz_container_wayland_map_event;
     widget_class->unmap = moz_container_wayland_unmap;
   } else {
 #endif
-    widget_class->size_allocate = moz_container_size_allocate;
+    //widget_class->size_allocate = moz_container_size_allocate;
     widget_class->unmap = moz_container_unmap;
 #ifdef MOZ_WAYLAND
   }
@@ -111,7 +111,7 @@ void moz_container_init(MozContainer* container) {
   container->wl = nullptr;
 #endif
   gtk_widget_set_can_focus(GTK_WIDGET(container), TRUE);
-  gtk_widget_set_redraw_on_allocate(GTK_WIDGET(container), FALSE);
+  //gtk_widget_set_redraw_on_allocate(GTK_WIDGET(container), FALSE);
 }
 
 static void moz_container_destroy(GtkWidget* widget) {
@@ -139,10 +139,10 @@ void moz_container_map(GtkWidget* widget) {
   LOGCONTAINER(("moz_container_map() [%p]",
                 (void*)moz_container_get_nsWindow(container)));
 
-  gtk_widget_set_mapped(widget, TRUE);
+  gtk_widget_map(widget);
 
-  if (gtk_widget_get_has_window(widget)) {
-    gdk_window_show(gtk_widget_get_window(widget));
+  if (gtk_widget_get_realized(widget)) {
+    gtk_widget_set_visible(GTK_WIDGET(gtk_widget_get_native(widget)), TRUE);
   }
 
   // Enable rendering to nsWindow/MozContainer
@@ -160,23 +160,24 @@ void moz_container_unmap(GtkWidget* widget) {
   nsWindow* window = moz_container_get_nsWindow(MOZ_CONTAINER(widget));
   window->OnUnmap();
 
-  gtk_widget_set_mapped(widget, FALSE);
+  gtk_widget_unmap(widget);
 
-  if (gtk_widget_get_has_window(widget)) {
-    gdk_window_hide(gtk_widget_get_window(widget));
+  if (gtk_widget_get_realized(widget)) {
+    gtk_widget_set_visible(GTK_WIDGET(gtk_widget_get_native(widget)), FALSE);
   }
 }
 
 void moz_container_realize(GtkWidget* widget) {
-  GdkWindow* parent = gtk_widget_get_parent_window(widget);
-  GdkWindow* window;
+  //GdkSurface* parent = gtk_native_get_surface(gtk_widget_get_native(widget));
+  //GdkSurface* window;
 
-  gtk_widget_set_realized(widget, TRUE);
+  gtk_widget_realize(widget);
 
-  GdkWindowAttr attributes;
-  gint attributes_mask = GDK_WA_VISUAL | GDK_WA_X | GDK_WA_Y;
+  //GdkWindowAttr attributes;
+  //gint attributes_mask = GDK_WA_VISUAL | GDK_WA_X | GDK_WA_Y;
+  /*
   GtkAllocation allocation;
-
+  
   gtk_widget_get_allocation(widget, &allocation);
   attributes.event_mask = gtk_widget_get_events(widget);
   attributes.x = allocation.x;
@@ -185,32 +186,32 @@ void moz_container_realize(GtkWidget* widget) {
   attributes.height = allocation.height;
   attributes.wclass = GDK_INPUT_OUTPUT;
   attributes.window_type = GDK_WINDOW_CHILD;
-  MozContainer* container = MOZ_CONTAINER(widget);
   attributes.visual = gtk_widget_get_visual(widget);
+  */
+  //MozContainer* container = MOZ_CONTAINER(widget);
+  //window = gdk_surface_new_popup(parent, FALSE);
 
-  window = gdk_window_new(parent, &attributes, attributes_mask);
+  //LOGCONTAINER(("moz_container_realize() [%p] GdkWindow %p\n",
+  //              (void*)moz_container_get_nsWindow(container), (void*)window));
 
-  LOGCONTAINER(("moz_container_realize() [%p] GdkWindow %p\n",
-                (void*)moz_container_get_nsWindow(container), (void*)window));
-
-  gtk_widget_register_window(widget, window);
-  gtk_widget_set_window(widget, window);
+  //gtk_widget_register_window(widget, window);
+  //gtk_widget_set_parent(widget, window);
 }
 
 void moz_container_unrealize(GtkWidget* widget) {
-  GdkWindow* window = gtk_widget_get_window(widget);
-  LOGCONTAINER(("moz_container_unrealize() [%p] GdkWindow %p\n",
-                (void*)moz_container_get_nsWindow(MOZ_CONTAINER(widget)),
-                (void*)window));
+  //GdkWindow* window = gtk_widget_get_window(widget);
+  //LOGCONTAINER(("moz_container_unrealize() [%p] GdkWindow %p\n",
+  //              (void*)moz_container_get_nsWindow(MOZ_CONTAINER(widget)),
+  //              (void*)window));
 
   if (gtk_widget_get_mapped(widget)) {
     gtk_widget_unmap(widget);
   }
 
-  gtk_widget_unregister_window(widget, window);
-  gtk_widget_set_window(widget, nullptr);
-  gdk_window_destroy(window);
-  gtk_widget_set_realized(widget, false);
+  //gtk_widget_unregister_window(widget, window);
+  //gtk_widget_set_window(widget, nullptr);
+  //gdk_window_destroy(window);
+  gtk_widget_unrealize(widget);
 }
 
 void moz_container_size_allocate(GtkWidget* widget, GtkAllocation* allocation) {
@@ -231,12 +232,12 @@ void moz_container_size_allocate(GtkWidget* widget, GtkAllocation* allocation) {
     return;
   }
 
-  gtk_widget_set_allocation(widget, allocation);
+  gtk_widget_size_allocate(widget, allocation, -1);
 
-  if (gtk_widget_get_has_window(widget) && gtk_widget_get_realized(widget)) {
-    gdk_window_move_resize(gtk_widget_get_window(widget), allocation->x,
-                           allocation->y, allocation->width,
-                           allocation->height);
+  if (gtk_widget_get_realized(widget)) {
+    //gdk_window_move_resize(gtk_widget_get_window(widget), allocation->x,
+    //                       allocation->y, allocation->width,
+    //                       allocation->height);
   }
 }
 
