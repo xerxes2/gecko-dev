@@ -32,7 +32,7 @@
 
 namespace mozilla::widget {
 
-using GtkMenuPopupAtRect = void (*)(GtkMenu* menu, GdkWindow* rect_window,
+using GtkMenuPopupAtRect = void (*)(GtkPopoverMenu* menu, GdkSurface* rect_window,
                                     const GdkRectangle* rect,
                                     GdkGravity rect_anchor,
                                     GdkGravity menu_anchor,
@@ -372,7 +372,7 @@ METHOD_SIGNAL(Unmap);
 NativeMenuGtk::NativeMenuGtk(dom::Element* aElement)
     : mMenuModel(MakeRefPtr<MenuModelGMenu>(aElement)) {
   // Floating, so no need to dont_AddRef.
-  mNativeMenu = gtk_menu_new_from_model(mMenuModel->GetModel());
+  mNativeMenu = gtk_popover_menu_new_from_model(mMenuModel->GetModel());
   gtk_widget_insert_action_group(mNativeMenu.get(), "menu",
                                  mMenuModel->GetActionGroup());
   g_signal_connect(mNativeMenu, "unmap", G_CALLBACK(OnUnmapSignal), this);
@@ -395,7 +395,7 @@ void NativeMenuGtk::ShowAsContextMenu(nsIFrame* aClickedFrame,
     // XXX Do we need to close menus here?
     return;
   }
-  auto* win = static_cast<GdkWindow*>(widget->GetNativeData(NS_NATIVE_WINDOW));
+  auto* win = static_cast<GdkSurface*>(widget->GetNativeData(NS_NATIVE_WINDOW));
   if (NS_WARN_IF(!win)) {
     return;
   }
@@ -405,12 +405,12 @@ void NativeMenuGtk::ShowAsContextMenu(nsIFrame* aClickedFrame,
   auto pos = (aPosition * aClickedFrame->PresContext()->CSSToDevPixelScale()) -
              geckoWin->WidgetToScreenOffset();
   auto gdkPos = geckoWin->DevicePixelsToGdkPointRoundDown(
-      LayoutDeviceIntPoint::Round(pos));
+       LayoutDeviceIntPoint::Round(pos));
 
   mMenuModel->WillShow();
   const GdkRectangle rect = {gdkPos.x, gdkPos.y, 1, 1};
   auto openFn = GetPopupAtRectFn();
-  openFn(GTK_MENU(mNativeMenu.get()), win, &rect, GDK_GRAVITY_NORTH_WEST,
+  openFn(GTK_POPOVER_MENU(mNativeMenu.get()), win, &rect, GDK_GRAVITY_NORTH_WEST,
          GDK_GRAVITY_NORTH_WEST, GetLastMousePressEvent());
 
   RefPtr pin{this};
@@ -421,7 +421,7 @@ bool NativeMenuGtk::Close() {
   if (!mMenuModel->IsShowing()) {
     return false;
   }
-  gtk_menu_popdown(GTK_MENU(mNativeMenu.get()));
+  gtk_popover_popdown(GTK_POPOVER(mNativeMenu.get()));
   return true;
 }
 
@@ -539,7 +539,7 @@ static uint32_t ParseModifiers(const nsAString& aModifiers) {
     if (nsCRT::strcmp(token, "shift") == 0) {
       modifier |= GDK_SHIFT_MASK;
     } else if (nsCRT::strcmp(token, "alt") == 0) {
-      modifier |= GDK_MOD1_MASK;
+      modifier |= GDK_ALT_MASK;
     } else if (nsCRT::strcmp(token, "meta") == 0) {
       modifier |= GDK_META_MASK;
     } else if (nsCRT::strcmp(token, "control") == 0) {
@@ -549,7 +549,7 @@ static uint32_t ParseModifiers(const nsAString& aModifiers) {
       if (accel == MODIFIER_META) {
         modifier |= GDK_META_MASK;
       } else if (accel == MODIFIER_ALT) {
-        modifier |= GDK_MOD1_MASK;
+        modifier |= GDK_ALT_MASK;
       } else if (accel == MODIFIER_CONTROL) {
         modifier |= GDK_CONTROL_MASK;
       }
@@ -733,7 +733,7 @@ void DBusMenuBar::OnNameOwnerChanged() {
     return;
   }
   auto* gdkWin =
-      static_cast<GdkWindow*>(widget->GetNativeData(NS_NATIVE_WINDOW));
+      static_cast<GdkSurface*>(widget->GetNativeData(NS_NATIVE_WINDOW));
   if (NS_WARN_IF(!gdkWin)) {
     return;
   }
@@ -749,7 +749,7 @@ void DBusMenuBar::OnNameOwnerChanged() {
       return;
     }
 
-    wl_surface* surface = gdk_wayland_window_get_wl_surface(gdkWin);
+    wl_surface* surface = gdk_wayland_surface_get_wl_surface(gdkWin);
     if (NS_WARN_IF(!surface)) {
       return;
     }
