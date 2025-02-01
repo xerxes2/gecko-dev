@@ -74,7 +74,7 @@
 #include "NativeKeyBindings.h"
 #include "nsAppDirectoryServiceDefs.h"
 #include "nsAppRunner.h"
-#include "nsDragService.h"
+//#include "nsDragService.h"
 #include "nsGTKToolkit.h"
 #include "nsGtkKeyUtils.h"
 #include "nsGtkCursors.h"
@@ -122,7 +122,7 @@
 #  include "WindowSurfaceX11SHM.h"
 #endif
 #ifdef MOZ_WAYLAND
-#  include <gdk/gdkkeysyms-compat.h>
+//#  include <gdk/gdkkeysyms-compat.h>
 #  include "nsIClipboard.h"
 #  include "nsView.h"
 #  include "WaylandVsyncSource.h"
@@ -143,26 +143,26 @@ using mozilla::gl::GLContextGLX;
 
 #if !GTK_CHECK_VERSION(3, 22, 0)
 
-constexpr gint GDK_WINDOW_STATE_TOP_TILED = 1 << 9;
-constexpr gint GDK_WINDOW_STATE_TOP_RESIZABLE = 1 << 10;
-constexpr gint GDK_WINDOW_STATE_RIGHT_TILED = 1 << 11;
-constexpr gint GDK_WINDOW_STATE_RIGHT_RESIZABLE = 1 << 12;
-constexpr gint GDK_WINDOW_STATE_BOTTOM_TILED = 1 << 13;
-constexpr gint GDK_WINDOW_STATE_BOTTOM_RESIZABLE = 1 << 14;
-constexpr gint GDK_WINDOW_STATE_LEFT_TILED = 1 << 15;
-constexpr gint GDK_WINDOW_STATE_LEFT_RESIZABLE = 1 << 16;
+constexpr gint GDK_TOPLEVEL_STATE_TOP_TILED = 1 << 9;
+constexpr gint GDK_TOPLEVEL_STATE_TOP_RESIZABLE = 1 << 10;
+constexpr gint GDK_TOPLEVEL_STATE_RIGHT_TILED = 1 << 11;
+constexpr gint GDK_TOPLEVEL_STATE_RIGHT_RESIZABLE = 1 << 12;
+constexpr gint GDK_TOPLEVEL_STATE_BOTTOM_TILED = 1 << 13;
+constexpr gint GDK_TOPLEVEL_STATE_BOTTOM_RESIZABLE = 1 << 14;
+constexpr gint GDK_TOPLEVEL_STATE_LEFT_TILED = 1 << 15;
+constexpr gint GDK_TOPLEVEL_STATE_BOTTOM_RESIZABLE = 1 << 16;
 
 #endif
 
 constexpr gint kPerSideTiledStates =
-    GDK_WINDOW_STATE_TOP_TILED | GDK_WINDOW_STATE_RIGHT_TILED |
-    GDK_WINDOW_STATE_BOTTOM_TILED | GDK_WINDOW_STATE_LEFT_TILED;
+    GDK_TOPLEVEL_STATE_TOP_TILED | GDK_TOPLEVEL_STATE_RIGHT_TILED |
+    GDK_TOPLEVEL_STATE_BOTTOM_TILED | GDK_TOPLEVEL_STATE_LEFT_TILED;
 
-constexpr gint kTiledStates = GDK_WINDOW_STATE_TILED | kPerSideTiledStates;
+constexpr gint kTiledStates = GDK_TOPLEVEL_STATE_TILED | kPerSideTiledStates;
 
 constexpr gint kResizableStates =
-    GDK_WINDOW_STATE_TOP_RESIZABLE | GDK_WINDOW_STATE_RIGHT_RESIZABLE |
-    GDK_WINDOW_STATE_BOTTOM_RESIZABLE | GDK_WINDOW_STATE_LEFT_RESIZABLE;
+    GDK_TOPLEVEL_STATE_TOP_RESIZABLE | GDK_TOPLEVEL_STATE_RIGHT_RESIZABLE |
+    GDK_TOPLEVEL_STATE_BOTTOM_RESIZABLE | GDK_TOPLEVEL_STATE_LEFT_RESIZABLE;
 
 #if !GTK_CHECK_VERSION(3, 18, 0)
 struct _GdkEventTouchpadPinch {
@@ -8914,7 +8914,7 @@ gint nsWindow::DevicePixelsToGdkCoordRoundDown(int aPixels) {
   return floor(aPixels / scale);
 }
 
-GdkPoint nsWindow::DevicePixelsToGdkPointRoundDown(
+GdkRectangle nsWindow::DevicePixelsToGdkPointRoundDown(
     const LayoutDeviceIntPoint& aPoint) {
   double scale = FractionalScaleFactor();
   return {int(aPoint.x / scale), int(aPoint.y / scale)};
