@@ -412,14 +412,14 @@ class nsWindow final : public nsBaseWidget {
   // To GDK
   gint DevicePixelsToGdkCoordRoundUp(int);
   gint DevicePixelsToGdkCoordRoundDown(int);
-  //GdkPoint DevicePixelsToGdkPointRoundDown(const LayoutDeviceIntPoint&);
+  GdkRectangle DevicePixelsToGdkPointRoundDown(const LayoutDeviceIntPoint&);
   GdkRectangle DevicePixelsToGdkSizeRoundUp(const LayoutDeviceIntSize&);
   GdkRectangle DevicePixelsToGdkRectRoundOut(const LayoutDeviceIntRect&);
   GdkRectangle DevicePixelsToGdkRectRoundIn(const LayoutDeviceIntRect&);
 
   // From GDK
   int GdkCoordToDevicePixels(gint);
-  //LayoutDeviceIntPoint GdkPointToDevicePixels(const GdkPoint&);
+  LayoutDeviceIntPoint GdkPointToDevicePixels(const GdkRectangle&);
   LayoutDeviceIntPoint GdkEventCoordsToDevicePixels(gdouble aX, gdouble aY);
   LayoutDeviceIntRect GdkRectToDevicePixels(const GdkRectangle&);
 
