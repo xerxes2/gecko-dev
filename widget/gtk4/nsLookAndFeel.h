@@ -13,6 +13,86 @@
 #include "nsCOMPtr.h"
 #include "gfxFont.h"
 
+#define THEME_DEFAULT_BASE "#ffffff"
+#define THEME_DEFAULT_TEXT "#000000"
+#define THEME_DEFAULT_BG "#f6f5f4"
+#define THEME_DEFAULT_FG "#2e3436"
+#define THEME_DEFAULT_FG_SEL "#ffffff"
+#define THEME_DEFAULT_BG_SEL "#3584e4"
+#define THEME_DEFAULT_BORD "darken($bg_color, 18%)"
+#define THEME_DEFAULT_BORD_SEL "darken($selected_bg_color, 15%)"
+#define THEME_DEFAULT_BORD_EDGE "transparentize(white, 0.2)"
+#define THEME_DEFAULT_BORD_ALT "darken($bg_color, 24%)"
+#define THEME_DEFAULT_LINK "darken($selected_bg_color, 10%)"
+#define THEME_DEFAULT_LINK_VIS "darken($selected_bg_color, 20%)"
+#define THEME_DEFAULT_HB_BG "lighten($bg_color, 5%)"
+#define THEME_DEFAULT_MENU THEME_DEFAULT_BASE
+#define THEME_DEFAULT_MENU_SEL "darken($bg_color, 6%)"
+#define THEME_DEFAULT_SCROLL_BG "mix($bg_color, $fg_color, 80%)"
+#define THEME_DEFAULT_SCROLL_SL "mix($fg_color, $bg_color, 60%)"
+#define THEME_DEFAULT_SCROLL_SL_HO "mix($fg_color, $bg_color, 80%)"
+#define THEME_DEFAULT_SCROLL_SL_AC "darken($selected_bg_color, 10%)"
+#define THEME_DEFAULT_WARN "#f57900"
+#define THEME_DEFAULT_ERR "#cc0000"
+#define THEME_DEFAULT_SUCC "#33d17a"
+#define THEME_DEFAULT_DEST "#e01b24"
+#define THEME_DEFAULT_DARK_FILL "mix($borders_color, $bg_color, 50%)"
+#define THEME_DEFAULT_SIDE_BG "mix($bg_color, $base_color, 50%)"
+#define THEME_DEFAULT_SHADOW "transparentize(black, 0.9)"
+#define THEME_DEFAULT_BG_INS "mix($bg_color, $base_color, 60%)"
+#define THEME_DEFAULT_FG_INS "mix($fg_color, $bg_color, 50%)"
+#define THEME_DEFAULT_BORD_INS "mix($borders_color, $bg_color, 80%)"
+#define THEME_DEFAULT_BASE_BACK "darken($base_color, 1%)"
+#define THEME_DEFAULT_TEXT_BACK "mix($text_color, $backdrop_base_color, 80%)"
+#define THEME_DEFAULT_BG_BACK THEME_DEFAULT_BG
+#define THEME_DEFAULT_FG_BACK "mix($fg_color, $backdrop_bg_color, 50%)"
+#define THEME_DEFAULT_BACK_INS "darken($backdrop_bg_color, 15%)"
+#define THEME_DEFAULT_FG_BACK_SEL "$backdrop_base_color"
+#define THEME_DEFAULT_BORD_BACK "mix($borders_color, $bg_color, 80%)"
+#define THEME_DEFAULT_DARK_FILL_BACK "mix($backdrop_borders_color, $backdrop_bg_color, 35%)"
+#define THEME_DEFAULT_DROP "#2ec27e"
+#define THEME_DEFAULT_TOOLT_BORD "transparentize(white, 0.9)"
+
+#define THEME_DEFAULT_DARK_BASE "lighten(desaturate(#241f31, 100%), 2%)"
+#define THEME_DEFAULT_DARK_TEXT "#ffffff"
+#define THEME_DEFAULT_DARK_BG "darken(desaturate(#3d3846, 100%), 4%)"
+#define THEME_DEFAULT_DARK_FG "#eeeeec"
+#define THEME_DEFAULT_DARK_FG_SEL "#ffffff"
+#define THEME_DEFAULT_DARK_BG_SEL "darken(#3584e4, 20%)"
+#define THEME_DEFAULT_DARK_BORD "darken($bg_color, 10%)"
+#define THEME_DEFAULT_DARK_BORD_SEL "darken($selected_bg_color, 30%))"
+#define THEME_DEFAULT_DARK_BORD_EDGE "transparentize($fg_color, 0.93))"
+#define THEME_DEFAULT_DARK_BORD_ALT "darken($bg_color, 18%)"
+#define THEME_DEFAULT_DARK_LINK "lighten($selected_bg_color, 20%)"
+#define THEME_DEFAULT_DARK_LINK_VIS "lighten($selected_bg_color, 10%)"
+#define THEME_DEFAULT_DARK_HB_BG "darken($bg_color, 3%))"
+#define THEME_DEFAULT_DARK_MENU THEME_DEFAULT_DARK_BASE
+#define THEME_DEFAULT_DARK_MENU_SEL "darken($bg_color, 8%)"
+#define THEME_DEFAULT_DARK_SCROLL_BG "mix($base_color, $bg_color, 50%))"
+#define THEME_DEFAULT_DARK_SCROLL_SL "mix($fg_color, $bg_color, 60%)"
+#define THEME_DEFAULT_DARK_SCROLL_SL_HO "mix($fg_color, $bg_color, 80%)"
+#define THEME_DEFAULT_DARK_SCROLL_SL_AC "lighten($selected_bg_color, 10%)"
+#define THEME_DEFAULT_DARK_WARN "#f57900"
+#define THEME_DEFAULT_DARK_ERR "#cc0000"
+#define THEME_DEFAULT_DARK_SUCC "darken(#33d17a, 10%)"
+#define THEME_DEFAULT_DARK_DEST "darken(#e01b24, 10%)"
+#define THEME_DEFAULT_DARK_DARK_FILL "mix($borders_color, $bg_color, 50%)"
+#define THEME_DEFAULT_DARK_SIDE_BG "mix($bg_color, $base_color, 50%)"
+#define THEME_DEFAULT_DARK_SHADOW "transparentize(black, 0.9)"
+#define THEME_DEFAULT_DARK_BG_INS "mix($bg_color, $base_color, 60%)"
+#define THEME_DEFAULT_DARK_FG_INS "mix($fg_color, $bg_color, 50%)"
+#define THEME_DEFAULT_DARK_BORD_INS "mix($borders_color, $bg_color, 80%)"
+#define THEME_DEFAULT_DARK_BASE_BACK "lighten($base_color, 1%)"
+#define THEME_DEFAULT_DARK_TEXT_BACK "mix($text_color, $backdrop_base_color, 80%)"
+#define THEME_DEFAULT_DARK_BG_BACK THEME_DEFAULT_DARK_BG
+#define THEME_DEFAULT_DARK_FG_BACK "mix($fg_color, $backdrop_bg_color, 50%)"
+#define THEME_DEFAULT_DARK_BACK_INS "lighten($backdrop_bg_color, 15%))"
+#define THEME_DEFAULT_DARK_FG_BACK_SEL "$backdrop_text_color"
+#define THEME_DEFAULT_DARK_BORD_BACK "mix($borders_color, $bg_color, 80%)"
+#define THEME_DEFAULT_DARK_DARK_FILL_BACK "mix($backdrop_borders_color, $backdrop_bg_color, 35%)"
+#define THEME_DEFAULT_DARK_DROP "#26a269"
+#define THEME_DEFAULT_DARK_TOOLT_BORD "transparentize(white, 0.9)"
+
 enum WidgetNodeType : int;
 struct _GtkStyle;
 typedef struct _GDBusProxy GDBusProxy;
@@ -154,29 +234,25 @@ class nsLookAndFeel final : public nsXPLookAndFeel {
     char16_t mInvisibleCharacter = 0;
     bool mMenuSupportsDrag = false;
 
-    void Init();
+    void Init(const char*, bool);
     nsresult GetColor(ColorID, nscolor&) const;
     bool GetFont(FontID, nsString& aFontName, gfxFontStyle&) const;
     void InitCellHighlightColors();
   };
 
-  PerThemeData mSystemTheme;
-
-  // If the system theme is light, a dark theme. Otherwise, a light theme. The
-  // alternative theme to the current one is preferred, but otherwise we fall
-  // back to Adwaita / Adwaita Dark, respectively.
-  PerThemeData mAltTheme;
+  PerThemeData mThemeDefault;
+  PerThemeData mThemeDefaultDark;
 
   const PerThemeData& LightTheme() const {
-    return mSystemTheme.mIsDark ? mAltTheme : mSystemTheme;
+    return mThemeDefault.mIsDark ? mThemeDefaultDark : mThemeDefault;
   }
 
   const PerThemeData& DarkTheme() const {
-    return mSystemTheme.mIsDark ? mSystemTheme : mAltTheme;
+    return mThemeDefault.mIsDark ? mThemeDefault : mThemeDefaultDark;
   }
 
   const PerThemeData& EffectiveTheme() const {
-    return mSystemThemeOverridden ? mAltTheme : mSystemTheme;
+    return mSystemUsesDarkTheme ? mThemeDefaultDark : mThemeDefault;
   }
 
   uint32_t mDBusID = 0;
@@ -204,7 +280,7 @@ class nsLookAndFeel final : public nsXPLookAndFeel {
   bool mCSDReversedPlacement = false;
   bool mPrefersReducedMotion = false;
   bool mInitialized = false;
-  bool mSystemThemeOverridden = false;
+  bool mSystemUsesDarkTheme = false;
   int32_t mCSDMaximizeButtonPosition = 0;
   int32_t mCSDMinimizeButtonPosition = 0;
   int32_t mCSDCloseButtonPosition = 0;
