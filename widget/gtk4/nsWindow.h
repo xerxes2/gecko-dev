@@ -253,7 +253,7 @@ class nsWindow final : public nsBaseWidget {
 
   // event callbacks
   gboolean OnExposeEvent(cairo_t* cr);
-  //gboolean OnConfigureEvent(GtkWidget* aWidget, GdkEventConfigure* aEvent);
+  gboolean OnConfigureEvent(GtkWidget* aWidget, GdkEvent* aEvent);
   void OnMap();
   void OnUnmap();
   void OnSizeAllocate(GtkAllocation* aAllocation);
@@ -277,7 +277,7 @@ class nsWindow final : public nsBaseWidget {
   //                             gint aX, gint aY,
   //                             GtkSelectionData* aSelectionData, guint aInfo,
   //                             guint aTime, gpointer aData);
-  //gboolean OnPropertyNotifyEvent(GtkWidget* aWidget, GdkEventProperty* aEvent);
+  gboolean OnPropertyNotifyEvent(GtkWidget* aWidget, GdkEvent* aEvent);
   gboolean OnTouchEvent(GdkTouchEvent* aEvent);
   gboolean OnTouchpadPinchEvent(GdkTouchpadEvent* aEvent);
   void OnTouchpadHoldEvent(GdkTouchpadGesturePhase aPhase, guint aTime,
@@ -582,8 +582,8 @@ class nsWindow final : public nsBaseWidget {
 #ifdef MOZ_WAYLAND
   RefPtr<mozilla::widget::WaylandSurface> mSurface;
 #endif
-  //mozilla::Maybe<GdkPoint> mGdkWindowOrigin;
-  //mozilla::Maybe<GdkPoint> mGdkWindowRootOrigin;
+  mozilla::Maybe<GdkRectangle> mGdkWindowOrigin;
+  mozilla::Maybe<GdkRectangle> mGdkWindowRootOrigin;
 
   PlatformCompositorWidgetDelegate* mCompositorWidgetDelegate = nullptr;
   mozilla::Atomic<WindowCompositorState, mozilla::Relaxed> mCompositorState{
@@ -798,7 +798,7 @@ class nsWindow final : public nsBaseWidget {
     GdkGravity mAnchorRectType = GDK_GRAVITY_NORTH_WEST;
     GdkGravity mPopupAnchorType = GDK_GRAVITY_NORTH_WEST;
     GdkAnchorHints mHints = GDK_ANCHOR_SLIDE;
-    //GdkPoint mOffset = {0, 0};
+    GdkRectangle mOffset = {0, 0};
     bool mAnchorSet = false;
   };
 
@@ -847,7 +847,7 @@ class nsWindow final : public nsBaseWidget {
   void ApplySizeConstraints();
 
   // Wayland Popup section
-  //GdkPoint WaylandGetParentPosition();
+  GdkRectangle WaylandGetParentPosition();
   bool WaylandPopupConfigure();
   bool WaylandPopupIsAnchored();
   bool WaylandPopupIsMenu();
@@ -880,10 +880,10 @@ class nsWindow final : public nsBaseWidget {
   void WaylandPopupMoveImpl();
   void WaylandPopupMovePlain(int aX, int aY);
   bool WaylandPopupRemoveNegativePosition(int* aX = nullptr, int* aY = nullptr);
-  //bool WaylandPopupCheckAndGetAnchor(GdkRectangle* aPopupAnchor,
-  //                                   GdkPoint* aOffset);
-  //bool WaylandPopupAnchorAdjustForParentPopup(GdkRectangle* aPopupAnchor,
-  //                                            GdkPoint* aOffset);
+  bool WaylandPopupCheckAndGetAnchor(GdkRectangle* aPopupAnchor,
+                                     GdkRectangle* aOffset);
+  bool WaylandPopupAnchorAdjustForParentPopup(GdkRectangle* aPopupAnchor,
+                                              GdkRectangle* aOffset);
   nsWindow* GetTopmostWindow();
   bool IsPopupInLayoutPopupChain(nsTArray<nsIWidget*>* aLayoutWidgetHierarchy,
                                  bool aMustMatchParent);
@@ -908,11 +908,11 @@ class nsWindow final : public nsBaseWidget {
   // mPopupPosition is the original popup position/size from layout, set by
   // nsWindow::Move() or nsWindow::Resize().
   // Popup position is relative to main (toplevel) window.
-  //GdkPoint mPopupPosition{};
+  GdkRectangle mPopupPosition{};
 
   // mRelativePopupPosition is popup position calculated against
   // recent popup parent window.
-  //GdkPoint mRelativePopupPosition{};
+  GdkRectangle mRelativePopupPosition{};
 
   // Toplevel window (first element) of linked list of Wayland popups. It's null
   // if we're the toplevel.
