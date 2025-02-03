@@ -88,7 +88,7 @@ RefPtr<Screen> ScreenHelperGTK::GetScreenForWindow(nsWindow* aWindow) {
     return nullptr;
   }
 
-  GdkSurface* gdkWindow = aWindow->GetToplevelGdkWindow();
+  GdkSurface* gdkWindow = aWindow->GetToplevelSurface();
   if (!gdkWindow) {
     LOG_SCREEN("  failed, can't get GdkWindow");
     return nullptr;
@@ -319,6 +319,10 @@ int ScreenHelperGTK::GetMonitorCount() {
   GListModel* monitors = gdk_display_get_monitors(display);
   guint n_monitors = g_list_model_get_n_items(monitors);
   return n_monitors;
+}
+
+bool ScreenHelperGTK::IsComposited() {
+  return gdk_display_is_composited(gdk_display_get_default());
 }
 
 ScreenHelperGTK::~ScreenHelperGTK() { gScreenGetter = nullptr; }
