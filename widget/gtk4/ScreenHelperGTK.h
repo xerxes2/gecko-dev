@@ -21,6 +21,7 @@ class ScreenHelperGTK final : public ScreenManager::Helper {
   ~ScreenHelperGTK();
 
   static int GetMonitorCount();
+  static bool IsComposited();
   static gint GetGTKMonitorScaleFactor(gint aMonitorNum = 0);
   static RefPtr<widget::Screen> GetScreenForWindow(nsWindow* aWindow);
 };
