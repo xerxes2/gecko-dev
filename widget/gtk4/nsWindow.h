@@ -322,7 +322,8 @@ class nsWindow final : public nsBaseWidget {
 
   MozContainer* GetMozContainer() { return mContainer; }
   GdkSurface* GetGdkWindow() const { return mGdkWindow; };
-  GdkSurface* GetToplevelGdkWindow() const;
+  GdkSurface* GetToplevelSurface() const;
+  GdkSurface* GetSurfaceFromWidget(GtkWidget*);
   GtkWidget* GetGtkWidget() const { return mShell; }
   nsIFrame* GetFrame() const;
   nsWindow* GetEffectiveParent();
