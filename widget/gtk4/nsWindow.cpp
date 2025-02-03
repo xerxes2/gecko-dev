@@ -231,7 +231,7 @@ static void hierarchy_changed_cb(GtkWidget* widget,
 static void settings_xft_dpi_changed_cb(GtkSettings* settings,
                                         GParamSpec* pspec, nsWindow* data);
 static void check_resize_cb(GtkWidget* container, gpointer user_data);
-//static void screen_composited_changed_cb(GdkScreen* screen, gpointer user_data);
+static void display_composited_changed_cb(GdkDisplay* display, gpointer user_data);
 static void widget_composited_changed_cb(GtkWidget* widget, gpointer user_data);
 
 static void scale_changed_cb(GtkWidget* widget, GParamSpec* aPSpec,
@@ -403,7 +403,7 @@ nsWindow::nsWindow()
       mCreated(false),
       mHandleTouchEvent(false),
       mIsDragPopup(false),
-      mCompositedScreen(gdk_display_is_composited(gdk_display_get_default())),
+      mCompositedScreen(ScreenHelperGTK::IsComposited()),
       mIsAccelerated(false),
       mIsAlert(false),
       mWindowShouldStartDragging(false),
@@ -1108,7 +1108,7 @@ void nsWindow::RemovePopupFromHierarchyList() {
 bool nsWindow::WaylandPopupRemoveNegativePosition(int* aX, int* aY) {
   // https://gitlab.gnome.org/GNOME/gtk/-/issues/4071 applies to temporary
   // windows only
-  GdkSurface* window = GetToplevelGdkWindow();
+  GdkSurface* window = GetToplevelSurface();
   if (!window) {
     return false;
   }
@@ -2521,7 +2521,7 @@ bool nsWindow::WaylandPopupCheckAndGetAnchor(GdkRectangle* aPopupAnchor,
                                              GdkRectangle* aOffset) {
   LOG("nsWindow::WaylandPopupCheckAndGetAnchor");
 
-  GdkSurface* gdkWindow = GetToplevelGdkWindow();
+  GdkSurface* gdkWindow = GetToplevelSurface();
   nsMenuPopupFrame* popupFrame = GetMenuPopupFrame(GetFrame());
   if (!gdkWindow || !popupFrame) {
     LOG("  can't use move-to-rect due missing gdkWindow or popupFrame");
@@ -2675,7 +2675,7 @@ void nsWindow::WaylandPopupMoveImpl() {
   // anyway but we need to set it now to avoid a race condition here.
   WaylandPopupRemoveNegativePosition();
 
-  GdkSurface* gdkWindow = GetToplevelGdkWindow();
+  GdkSurface* gdkWindow = GetToplevelSurface();
   if (!g_signal_handler_find(gdkWindow, G_SIGNAL_MATCH_FUNC, 0, 0, nullptr,
                              FuncToGpointer(NativeMoveResizeCallback), this)) {
     g_signal_connect(gdkWindow, "moved-to-rect",
@@ -4276,7 +4276,7 @@ void nsWindow::EmulateResizeDrag(GdkMotionEvent* aEvent) {
   //gtk_window_resize(GTK_WINDOW(mShell), newSize.width, newSize.height);
 }
 
-void nsWindow::OnMotionNotifyEvent(GdkEventMotion* aEvent) {
+void nsWindow::OnMotionNotifyEvent(GdkMotionEvent* aEvent) {
   mLastMouseCoordinates.Set(aEvent);
 
   if (!mGdkWindow) {
@@ -4292,11 +4292,12 @@ void nsWindow::OnMotionNotifyEvent(GdkEventMotion* aEvent) {
 
   if (mWindowShouldStartDragging) {
     mWindowShouldStartDragging = false;
-    GdkWindow* dragWindow = nullptr;
+    GdkSurface* dragWindow = nullptr;
 
     // find the top-level window
     if (mGdkWindow) {
-      dragWindow = gdk_window_get_toplevel(mGdkWindow);
+      //dragWindow = gdk_window_get_toplevel(mGdkWindow);
+      dragWindow = gtk_native_get_surface(gtk_widget_get_native(mShell));
       MOZ_ASSERT(dragWindow, "gdk_window_get_toplevel should not return null");
     }
 
@@ -4314,8 +4315,8 @@ void nsWindow::OnMotionNotifyEvent(GdkEventMotion* aEvent) {
 #endif
 
     if (dragWindow) {
-      gdk_window_begin_move_drag(dragWindow, 1, aEvent->x_root, aEvent->y_root,
-                                 aEvent->time);
+      //gdk_window_begin_move_drag(dragWindow, 1, aEvent->x_root, aEvent->y_root,
+      //                           aEvent->time);
       return;
     }
   }
@@ -4325,20 +4326,20 @@ void nsWindow::OnMotionNotifyEvent(GdkEventMotion* aEvent) {
   if (auto edge = CheckResizerEdge(refPoint)) {
     nsCursor cursor = eCursor_none;
     switch (*edge) {
-      case GDK_WINDOW_EDGE_SOUTH:
-      case GDK_WINDOW_EDGE_NORTH:
+      case GDK_SURFACE_EDGE_SOUTH:
+      case GDK_SURFACE_EDGE_NORTH:
         cursor = eCursor_ns_resize;
         break;
-      case GDK_WINDOW_EDGE_WEST:
-      case GDK_WINDOW_EDGE_EAST:
+      case GDK_SURFACE_EDGE_WEST:
+      case GDK_SURFACE_EDGE_EAST:
         cursor = eCursor_ew_resize;
         break;
-      case GDK_WINDOW_EDGE_NORTH_WEST:
-      case GDK_WINDOW_EDGE_SOUTH_EAST:
+      case GDK_SURFACE_EDGE_NORTH_WEST:
+      case GDK_SURFACE_EDGE_SOUTH_EAST:
         cursor = eCursor_nwse_resize;
         break;
-      case GDK_WINDOW_EDGE_NORTH_EAST:
-      case GDK_WINDOW_EDGE_SOUTH_WEST:
+      case GDK_SURFACE_EDGE_NORTH_EAST:
+      case GDK_SURFACE_EDGE_SOUTH_WEST:
         cursor = eCursor_nesw_resize;
         break;
     }
@@ -4363,9 +4364,8 @@ void nsWindow::OnMotionNotifyEvent(GdkEventMotion* aEvent) {
   }
   event.mPressure = mLastMotionPressure;
   event.mRefPoint = refPoint;
-  event.AssignEventTime(GetWidgetEventTime(aEvent->time));
-
-  KeymapWrapper::InitInputEvent(event, aEvent->state);
+  event.AssignEventTime(GetWidgetEventTime(gdk_event_get_time((GDK_EVENT(aEvent)))));
+  KeymapWrapper::InitInputEvent(event, gdk_event_get_modifier_state((GDK_EVENT(aEvent))));
   InitPenEvent(event, (GdkEvent*)aEvent);
 
   DispatchInputEvent(&event);
@@ -4378,12 +4378,12 @@ void nsWindow::OnMotionNotifyEvent(GdkEventMotion* aEvent) {
 // True as the ButtonRelease may be received on a foreign [plugin] window).
 // Use this method to check for released buttons when the pointer returns to a
 // Gecko window.
-void nsWindow::DispatchMissedButtonReleases(GdkEventCrossing* aGdkEvent) {
-  guint changed = aGdkEvent->state ^ gButtonState;
+void nsWindow::DispatchMissedButtonReleases(GdkCrossingEvent* aGdkEvent) {
+  guint changed = gdk_event_get_modifier_state(GDK_EVENT(aGdkEvent)) ^ gButtonState;
   // Only consider button releases.
   // (Ignore button presses that occurred outside Gecko.)
   guint released = changed & gButtonState;
-  gButtonState = aGdkEvent->state;
+  gButtonState = gdk_event_get_modifier_state(GDK_EVENT(aGdkEvent));
 
   // Loop over each button, excluding mouse wheel buttons 4 and 5 for which
   // GDK ignores releases.
@@ -4419,16 +4419,16 @@ void nsWindow::DispatchMissedButtonReleases(GdkEventCrossing* aGdkEvent) {
 }
 
 void nsWindow::InitButtonEvent(WidgetMouseEvent& aEvent,
-                               GdkEventButton* aGdkEvent,
+                               GdkButtonEvent* aGdkEvent,
                                const LayoutDeviceIntPoint& aRefPoint) {
   aEvent.mRefPoint = aRefPoint;
 
-  guint modifierState = aGdkEvent->state;
+  guint modifierState = gdk_event_get_modifier_state(GDK_EVENT(aGdkEvent));
   // aEvent's state includes the button state from immediately before this
   // event.  If aEvent is a mousedown or mouseup event, we need to update
   // the button state.
   guint buttonMask = 0;
-  switch (aGdkEvent->button) {
+  switch (gdk_button_event_get_button(GDK_EVENT(aGdkEvent))) {
     case 1:
       buttonMask = GDK_BUTTON1_MASK;
       break;
@@ -4439,7 +4439,7 @@ void nsWindow::InitButtonEvent(WidgetMouseEvent& aEvent,
       buttonMask = GDK_BUTTON3_MASK;
       break;
   }
-  if (aGdkEvent->type == GDK_BUTTON_RELEASE) {
+  if (gdk_event_get_event_type(GDK_EVENT(aGdkEvent)) == GDK_BUTTON_RELEASE) {
     modifierState &= ~buttonMask;
   } else {
     modifierState |= buttonMask;
@@ -4447,9 +4447,9 @@ void nsWindow::InitButtonEvent(WidgetMouseEvent& aEvent,
 
   KeymapWrapper::InitInputEvent(aEvent, modifierState);
 
-  aEvent.AssignEventTime(GetWidgetEventTime(aGdkEvent->time));
-
-  switch (aGdkEvent->type) {
+  aEvent.AssignEventTime(GetWidgetEventTime(gdk_event_get_time(GDK_EVENT(aGdkEvent))));
+  /*
+  switch (gdk_event_get_event_type(GDK_EVENT(aGdkEvent))) {
     case GDK_2BUTTON_PRESS:
       aEvent.mClickCount = 2;
       break;
@@ -4459,7 +4459,8 @@ void nsWindow::InitButtonEvent(WidgetMouseEvent& aEvent,
       // default is one click
     default:
       aEvent.mClickCount = 1;
-  }
+  }*/
+  aEvent.mClickCount = 1;
 }
 
 static guint ButtonMaskFromGDKButton(guint button) {
@@ -4467,7 +4468,7 @@ static guint ButtonMaskFromGDKButton(guint button) {
 }
 
 void nsWindow::DispatchContextMenuEventFromMouseEvent(
-    uint16_t domButton, GdkEventButton* aEvent,
+    uint16_t domButton, GdkButtonEvent* aEvent,
     const LayoutDeviceIntPoint& aRefPoint) {
   if (domButton == MouseButton::eSecondary && MOZ_LIKELY(!mIsDestroyed)) {
     WidgetPointerEvent contextMenuEvent(true, eContextMenu, this);
@@ -4477,14 +4478,14 @@ void nsWindow::DispatchContextMenuEventFromMouseEvent(
   }
 }
 
-void nsWindow::TryToShowNativeWindowMenu(GdkEventButton* aEvent) {
-  if (!gdk_window_show_window_menu(GetToplevelGdkWindow(), (GdkEvent*)aEvent)) {
-    NS_WARNING("Native context menu wasn't shown");
-  }
+void nsWindow::TryToShowNativeWindowMenu(GdkButtonEvent* aEvent) {
+  //if (!gdk_window_show_window_menu(GetToplevelGdkWindow(), (GdkEvent*)aEvent)) {
+  //  NS_WARNING("Native context menu wasn't shown");
+  //}
 }
 
 bool nsWindow::DoTitlebarAction(LookAndFeel::TitlebarEvent aEvent,
-                                GdkEventButton* aButtonEvent) {
+                                GdkButtonEvent* aButtonEvent) {
   LOG("DoTitlebarAction %s click",
       aEvent == LookAndFeel::TitlebarEvent::Double_Click ? "double" : "middle");
   switch (LookAndFeel::GetTitlebarAction(aEvent)) {
@@ -4500,7 +4501,7 @@ bool nsWindow::DoTitlebarAction(LookAndFeel::TitlebarEvent aEvent,
       if (GdkIsWaylandDisplay()) {
         SetSizeMode(nsSizeMode_Minimized);
       } else {
-        gdk_window_lower(GetToplevelGdkWindow());
+        //gdk_window_lower(GetToplevelGdkWindow());
       }
       break;
     case LookAndFeel::TitlebarAction::WindowMinimize:
@@ -4527,11 +4528,11 @@ bool nsWindow::DoTitlebarAction(LookAndFeel::TitlebarEvent aEvent,
   return true;
 }
 
-void nsWindow::OnButtonPressEvent(GdkEventButton* aEvent) {
-  LOG("Button %u press\n", aEvent->button);
+void nsWindow::OnButtonPressEvent(GdkButtonEvent* aGdkEvent) {
+  LOG("Button %u press\n", gdk_button_event_get_button(GDK_EVENT(aGdkEvent)));
 
-  SetLastMousePressEvent((GdkEvent*)aEvent);
-  mLastMouseCoordinates.Set(aEvent);
+  SetLastMousePressEvent((GdkEvent*)aGdkEvent);
+  mLastMouseCoordinates.Set(aGdkEvent);
 
   // If you double click in GDK, it will actually generate a second
   // GDK_BUTTON_PRESS before sending the GDK_2BUTTON_PRESS, and this is
@@ -4539,21 +4540,21 @@ void nsWindow::OnButtonPressEvent(GdkEventButton* aEvent) {
   // programatically, so it's safe to assume that if there's a
   // double click in the queue, it was generated so we can just drop
   // this click.
-  GUniquePtr<GdkEvent> peekedEvent(gdk_event_peek());
-  if (peekedEvent) {
-    GdkEventType type = peekedEvent->any.type;
-    if (type == GDK_2BUTTON_PRESS || type == GDK_3BUTTON_PRESS) {
-      return;
-    }
-  }
+  //GUniquePtr<GdkEvent> peekedEvent(gdk_event_peek());
+  //if (peekedEvent) {
+  //  GdkEventType type = peekedEvent->any.type;
+  //  if (type == GDK_2BUTTON_PRESS || type == GDK_3BUTTON_PRESS) {
+  //    return;
+  //  }
+  //}
 
   nsWindow* containerWindow = GetContainerWindow();
   if (!gFocusWindow && containerWindow) {
     containerWindow->DispatchActivateEvent();
   }
 
-  const auto refPoint = GetRefPoint(this, aEvent);
-
+  const auto refPoint = GetRefPoint(this, aGdkEvent);
+  /*
   // check to see if we should rollup
   if (CheckForRollup(aEvent->x_root, aEvent->y_root, false, false)) {
     if (aEvent->button == 3 && mDraggableRegion.Contains(refPoint)) {
@@ -4569,19 +4570,21 @@ void nsWindow::OnButtonPressEvent(GdkEventButton* aEvent) {
     }
     return;
   }
-
+  */
   // Check to see if the event is within our window's resize region
   if (auto edge = CheckResizerEdge(refPoint)) {
     // On Wayland Gtk fails to vertically/horizontally resize windows
     // with fixed aspect ratio. We need to emulate
     // gdk_window_begin_resize_drag() at OnMotionNotifyEvent().
+    double x, y;
+    gdk_event_get_position(GDK_EVENT(aGdkEvent), &x, &y);
     if (mAspectRatio != 0.0f && GdkIsWaylandDisplay()) {
-      mLastResizePoint = LayoutDeviceIntPoint::Floor(aEvent->x, aEvent->y);
+      mLastResizePoint = LayoutDeviceIntPoint::Floor(x, y);
       switch (*edge) {
-        case GDK_WINDOW_EDGE_SOUTH:
+        case GDK_SURFACE_EDGE_SOUTH:
           mAspectResizer = Some(GTK_ORIENTATION_VERTICAL);
           break;
-        case GDK_WINDOW_EDGE_EAST:
+        case GDK_SURFACE_EDGE_EAST:
           mAspectResizer = Some(GTK_ORIENTATION_HORIZONTAL);
           break;
         default:
@@ -4590,20 +4593,22 @@ void nsWindow::OnButtonPressEvent(GdkEventButton* aEvent) {
       }
       ApplySizeConstraints();
     }
+    /*
     if (!mAspectResizer) {
       gdk_window_begin_resize_drag(GetToplevelGdkWindow(), *edge,
                                    aEvent->button, aEvent->x_root,
                                    aEvent->y_root, aEvent->time);
     }
+    */
     return;
   }
 
   gdouble pressure = 0;
-  gdk_event_get_axis((GdkEvent*)aEvent, GDK_AXIS_PRESSURE, &pressure);
+  gdk_event_get_axis((GdkEvent*)aGdkEvent, GDK_AXIS_PRESSURE, &pressure);
   mLastMotionPressure = pressure;
 
   uint16_t domButton;
-  switch (aEvent->button) {
+  switch (gdk_button_event_get_button(GDK_EVENT(aGdkEvent))) {
     case 1:
       domButton = MouseButton::ePrimary;
       break;
@@ -4636,14 +4641,14 @@ void nsWindow::OnButtonPressEvent(GdkEventButton* aEvent) {
       return;
   }
 
-  gButtonState |= ButtonMaskFromGDKButton(aEvent->button);
+  gButtonState |= ButtonMaskFromGDKButton(gdk_button_event_get_button(GDK_EVENT(aGdkEvent)));
 
   WidgetMouseEvent event(true, eMouseDown, this, WidgetMouseEvent::eReal);
   event.mButton = domButton;
-  InitButtonEvent(event, aEvent, refPoint);
+  InitButtonEvent(event, aGdkEvent, refPoint);
   event.mPressure = mLastMotionPressure;
 
-  InitPenEvent(event, (GdkEvent*)aEvent);
+  InitPenEvent(event, (GdkEvent*)aGdkEvent);
   nsIWidget::ContentAndAPZEventStatus eventStatus = DispatchInputEvent(&event);
 
   const bool defaultPrevented =
@@ -4654,22 +4659,22 @@ void nsWindow::OnButtonPressEvent(GdkEventButton* aEvent) {
       mWindowShouldStartDragging = true;
     } else if (domButton == MouseButton::eMiddle &&
                StaticPrefs::widget_gtk_titlebar_action_middle_click_enabled()) {
-      DoTitlebarAction(nsXPLookAndFeel::TitlebarEvent::Middle_Click, aEvent);
+      DoTitlebarAction(nsXPLookAndFeel::TitlebarEvent::Middle_Click, aGdkEvent);
     }
   }
 
   // right menu click on linux should also pop up a context menu
   if (!StaticPrefs::ui_context_menus_after_mouseup() &&
       eventStatus.mApzStatus != nsEventStatus_eConsumeNoDefault) {
-    DispatchContextMenuEventFromMouseEvent(domButton, aEvent, refPoint);
+    DispatchContextMenuEventFromMouseEvent(domButton, aGdkEvent, refPoint);
   }
 }
 
-void nsWindow::OnButtonReleaseEvent(GdkEventButton* aEvent) {
-  LOG("Button %u release\n", aEvent->button);
+void nsWindow::OnButtonReleaseEvent(GdkButtonEvent* aGdkEvent) {
+  LOG("Button %u release\n", gdk_button_event_get_button(GDK_EVENT(aGdkEvent)));
 
   SetLastMousePressEvent(nullptr);
-  mLastMouseCoordinates.Set(aEvent);
+  mLastMouseCoordinates.Set(aGdkEvent);
 
   if (!mGdkWindow) {
     return;
@@ -4685,7 +4690,7 @@ void nsWindow::OnButtonReleaseEvent(GdkEventButton* aEvent) {
   }
 
   uint16_t domButton;
-  switch (aEvent->button) {
+  switch (gdk_button_event_get_button(GDK_EVENT(aGdkEvent))) {
     case 1:
       domButton = MouseButton::ePrimary;
       break;
@@ -4699,22 +4704,22 @@ void nsWindow::OnButtonReleaseEvent(GdkEventButton* aEvent) {
       return;
   }
 
-  gButtonState &= ~ButtonMaskFromGDKButton(aEvent->button);
+  gButtonState &= ~ButtonMaskFromGDKButton(gdk_button_event_get_button(GDK_EVENT(aGdkEvent)));
 
-  const auto refPoint = GetRefPoint(this, aEvent);
+  const auto refPoint = GetRefPoint(this, aGdkEvent);
 
   WidgetMouseEvent event(true, eMouseUp, this, WidgetMouseEvent::eReal);
   event.mButton = domButton;
-  InitButtonEvent(event, aEvent, refPoint);
+  InitButtonEvent(event, aGdkEvent, refPoint);
   gdouble pressure = 0;
-  gdk_event_get_axis((GdkEvent*)aEvent, GDK_AXIS_PRESSURE, &pressure);
+  gdk_event_get_axis((GdkEvent*)aGdkEvent, GDK_AXIS_PRESSURE, &pressure);
   event.mPressure = pressure ? (float)pressure : (float)mLastMotionPressure;
 
   // The mRefPoint is manipulated in DispatchInputEvent, we're saving it
   // to use it for the doubleclick position check.
   const LayoutDeviceIntPoint pos = event.mRefPoint;
 
-  InitPenEvent(event, (GdkEvent*)aEvent);
+  InitPenEvent(event, (GdkEvent*)aGdkEvent);
 
   nsIWidget::ContentAndAPZEventStatus eventStatus = DispatchInputEvent(&event);
 
@@ -4725,24 +4730,24 @@ void nsWindow::OnButtonReleaseEvent(GdkEventButton* aEvent) {
   if (!defaultPrevented && mDrawInTitlebar &&
       event.mButton == MouseButton::ePrimary && event.mClickCount == 2 &&
       mDraggableRegion.Contains(pos)) {
-    DoTitlebarAction(nsXPLookAndFeel::TitlebarEvent::Double_Click, aEvent);
+    DoTitlebarAction(nsXPLookAndFeel::TitlebarEvent::Double_Click, aGdkEvent);
   }
   mLastMotionPressure = pressure;
 
   // right menu click on linux should also pop up a context menu
   if (StaticPrefs::ui_context_menus_after_mouseup() &&
       eventStatus.mApzStatus != nsEventStatus_eConsumeNoDefault) {
-    DispatchContextMenuEventFromMouseEvent(domButton, aEvent, refPoint);
+    DispatchContextMenuEventFromMouseEvent(domButton, aGdkEvent, refPoint);
   }
 
   // Open window manager menu on PIP window to allow user
   // to place it on top / all workspaces.
-  if (mAlwaysOnTop && aEvent->button == 3) {
-    TryToShowNativeWindowMenu(aEvent);
+  if (mAlwaysOnTop && gdk_button_event_get_button(GDK_EVENT(aGdkEvent)) == 3) {
+    TryToShowNativeWindowMenu(aGdkEvent);
   }
 }
 
-void nsWindow::OnContainerFocusInEvent(GdkEventFocus* aEvent) {
+void nsWindow::OnContainerFocusInEvent(GdkFocusEvent* aGdkEvent) {
   LOG("OnContainerFocusInEvent");
 
   // Unset the urgency hint, if possible
@@ -4775,7 +4780,7 @@ void nsWindow::OnContainerFocusInEvent(GdkEventFocus* aEvent) {
   LOG("Events sent from focus in event");
 }
 
-void nsWindow::OnContainerFocusOutEvent(GdkEventFocus* aEvent) {
+void nsWindow::OnContainerFocusOutEvent(GdkFocusEvent* aGdkEvent) {
   LOG("OnContainerFocusOutEvent");
 
   if (IsTopLevelWidget()) {
@@ -4889,55 +4894,57 @@ mozilla::CurrentX11TimeGetter* nsWindow::GetCurrentTimeGetter() {
 }
 #endif
 
-gboolean nsWindow::OnKeyPressEvent(GdkEventKey* aEvent) {
+gboolean nsWindow::OnKeyPressEvent(GdkKeyEvent* aGdkEvent) {
   LOG("OnKeyPressEvent");
 
-  KeymapWrapper::HandleKeyPressEvent(this, aEvent);
+  KeymapWrapper::HandleKeyPressEvent(this, aGdkEvent);
   return TRUE;
 }
 
-gboolean nsWindow::OnKeyReleaseEvent(GdkEventKey* aEvent) {
+gboolean nsWindow::OnKeyReleaseEvent(GdkKeyEvent* aGdkEvent) {
   LOG("OnKeyReleaseEvent");
-  if (NS_WARN_IF(!KeymapWrapper::HandleKeyReleaseEvent(this, aEvent))) {
+  if (NS_WARN_IF(!KeymapWrapper::HandleKeyReleaseEvent(this, aGdkEvent))) {
     return FALSE;
   }
   return TRUE;
 }
 
-void nsWindow::OnScrollEvent(GdkEventScroll* aEvent) {
-  LOG("OnScrollEvent time %d", aEvent->time);
+void nsWindow::OnScrollEvent(GdkScrollEvent* aGdkEvent) {
+  LOG("OnScrollEvent time %d", gdk_event_get_time(GDK_EVENT(aGdkEvent)));
 
-  mLastMouseCoordinates.Set(aEvent);
+  mLastMouseCoordinates.Set(aGdkEvent);
 
   // This event was already handled by OnSmoothScrollEvent().
-  if (aEvent->time != GDK_CURRENT_TIME &&
-      mLastSmoothScrollEventTime == aEvent->time) {
+  if (gdk_event_get_time(GDK_EVENT(aGdkEvent)) != GDK_CURRENT_TIME &&
+      mLastSmoothScrollEventTime == gdk_event_get_time(GDK_EVENT(aGdkEvent))) {
     return;
   }
 
   // check to see if we should rollup
-  if (CheckForRollup(aEvent->x_root, aEvent->y_root, true, false)) {
-    return;
-  }
+  //if (CheckForRollup(aEvent->x_root, aEvent->y_root, true, false)) {
+  //  return;
+  //}
+  double delta_x, delta_y;
+  gdk_scroll_event_get_deltas(GDK_EVENT(aGdkEvent), &delta_x, &delta_y);
 
   // check for duplicate legacy scroll event, see GNOME bug 726878
-  if (aEvent->direction != GDK_SCROLL_SMOOTH &&
-      mLastScrollEventTime == aEvent->time) {
-    LOG("[%d] duplicate legacy scroll event %d\n", aEvent->time,
-        aEvent->direction);
+  if (gdk_scroll_event_get_direction(GDK_EVENT(aGdkEvent)) != GDK_SCROLL_SMOOTH &&
+      mLastScrollEventTime == gdk_event_get_time(GDK_EVENT(aGdkEvent))) {
+    LOG("[%d] duplicate legacy scroll event %d\n", gdk_event_get_time(GDK_EVENT(aGdkEvent)),
+        gdk_scroll_event_get_direction(GDK_EVENT(aGdkEvent)));
     return;
   }
   WidgetWheelEvent wheelEvent(true, eWheel, this);
   wheelEvent.mDeltaMode = dom::WheelEvent_Binding::DOM_DELTA_LINE;
-  switch (aEvent->direction) {
+  switch (gdk_scroll_event_get_direction(GDK_EVENT(aGdkEvent))) {
     case GDK_SCROLL_SMOOTH: {
       // As of GTK 3.4, all directional scroll events are provided by
       // the GDK_SCROLL_SMOOTH direction on XInput2 and Wayland devices.
-      mLastScrollEventTime = aEvent->time;
+      mLastScrollEventTime = gdk_event_get_time(GDK_EVENT(aGdkEvent));
 
       // Special handling for touchpads to support flings
       // (also known as kinetic/inertial/momentum scrolling)
-      GdkDevice* device = gdk_event_get_source_device((GdkEvent*)aEvent);
+      GdkDevice* device = gdk_event_get_device(GDK_EVENT(aGdkEvent));
       GdkInputSource source = gdk_device_get_source(device);
       if (source == GDK_SOURCE_TOUCHSCREEN || source == GDK_SOURCE_TOUCHPAD ||
           mCurrentSynthesizedTouchpadPan.mTouchpadGesturePhase.isSome()) {
@@ -4946,11 +4953,10 @@ void nsWindow::OnScrollEvent(GdkEventScroll* aEvent) {
           static auto sGdkEventIsScrollStopEvent =
               (gboolean(*)(const GdkEvent*))dlsym(
                   RTLD_DEFAULT, "gdk_event_is_scroll_stop_event");
-
-          LOG("[%d] pan smooth event dx=%f dy=%f inprogress=%d\n", aEvent->time,
-              aEvent->delta_x, aEvent->delta_y, mPanInProgress);
+          LOG("[%d] pan smooth event dx=%f dy=%f inprogress=%d\n", gdk_event_get_time(GDK_EVENT(aGdkEvent)),
+              delta_x, delta_y, mPanInProgress);
           auto eventType = PanGestureInput::PANGESTURE_PAN;
-          if (sGdkEventIsScrollStopEvent((GdkEvent*)aEvent)) {
+          if (sGdkEventIsScrollStopEvent((GdkEvent*)aGdkEvent)) {
             eventType = PanGestureInput::PANGESTURE_END;
             mPanInProgress = false;
           } else if (!mPanInProgress) {
@@ -4998,14 +5004,14 @@ void nsWindow::OnScrollEvent(GdkEventScroll* aEvent) {
                             apz_gtk_pangesture_pixel_delta_mode_multiplier() *
                         FractionalScaleFactor();
 
-          ScreenPoint deltas(float(aEvent->delta_x * multiplier),
-                             float(aEvent->delta_y * multiplier));
+          ScreenPoint deltas(float(delta_x * multiplier),
+                             float(delta_y * multiplier));
 
-          LayoutDeviceIntPoint touchPoint = GetRefPoint(this, aEvent);
+          LayoutDeviceIntPoint touchPoint = GetRefPoint(this, aGdkEvent);
           PanGestureInput panEvent(
-              eventType, GetEventTimeStamp(aEvent->time),
+              eventType, GetEventTimeStamp(gdk_event_get_time(GDK_EVENT(aGdkEvent))),
               ScreenPoint(touchPoint.x, touchPoint.y), deltas,
-              KeymapWrapper::ComputeKeyModifiers(aEvent->state));
+              KeymapWrapper::ComputeKeyModifiers(gdk_event_get_modifier_state(GDK_EVENT(aGdkEvent))));
           panEvent.mDeltaType = isPageMode ? PanGestureInput::PANDELTA_PAGE
                                            : PanGestureInput::PANDELTA_PIXEL;
           panEvent.mSimulateMomentum =
@@ -5029,10 +5035,10 @@ void nsWindow::OnScrollEvent(GdkEventScroll* aEvent) {
 
       // TODO - use a more appropriate scrolling unit than lines.
       // Multiply event deltas by 3 to emulate legacy behaviour.
-      wheelEvent.mDeltaX = aEvent->delta_x * 3;
-      wheelEvent.mDeltaY = aEvent->delta_y * 3;
-      wheelEvent.mWheelTicksX = aEvent->delta_x;
-      wheelEvent.mWheelTicksY = aEvent->delta_y;
+      wheelEvent.mDeltaX = delta_x * 3;
+      wheelEvent.mDeltaY = delta_y * 3;
+      wheelEvent.mWheelTicksX = delta_x;
+      wheelEvent.mWheelTicksY = delta_y;
       wheelEvent.mIsNoLineOrPageDelta = true;
 
       break;
@@ -5055,11 +5061,11 @@ void nsWindow::OnScrollEvent(GdkEventScroll* aEvent) {
       break;
   }
 
-  wheelEvent.mRefPoint = GetRefPoint(this, aEvent);
+  wheelEvent.mRefPoint = GetRefPoint(this, aGdkEvent);
 
-  KeymapWrapper::InitInputEvent(wheelEvent, aEvent->state);
+  KeymapWrapper::InitInputEvent(wheelEvent, gdk_event_get_modifier_state(GDK_EVENT(aGdkEvent)));
 
-  wheelEvent.AssignEventTime(GetWidgetEventTime(aEvent->time));
+  wheelEvent.AssignEventTime(GetWidgetEventTime(gdk_event_get_time(GDK_EVENT(aGdkEvent))));
 
   DispatchInputEvent(&wheelEvent);
 }
@@ -5127,7 +5133,7 @@ void nsWindow::DispatchPanGesture(PanGestureInput& aPanInput) {
 
   ProcessUntransformedAPZEvent(&event, result);
 }
-
+/*
 void nsWindow::OnVisibilityNotifyEvent(GdkVisibilityState aState) {
   LOG("nsWindow::OnVisibilityNotifyEvent [%p] state 0x%x\n", this, aState);
   auto state = aState == GDK_VISIBILITY_FULLY_OBSCURED
@@ -5135,7 +5141,8 @@ void nsWindow::OnVisibilityNotifyEvent(GdkVisibilityState aState) {
                    : OcclusionState::UNKNOWN;
   NotifyOcclusionState(state);
 }
-
+*/
+/*
 void nsWindow::OnWindowStateEvent(GtkWidget* aWidget,
                                   GdkEventWindowState* aEvent) {
   LOG("nsWindow::OnWindowStateEvent for %p changed 0x%x new_window_state "
@@ -5287,7 +5294,7 @@ void nsWindow::OnWindowStateEvent(GtkWidget* aWidget,
     mWidgetListener->SizeModeChanged(mSizeMode);
   }
 }
-
+*/
 void nsWindow::OnDPIChanged() {
   // Update menu's font size etc.
   // This affects style / layout because it affects system font sizes.
@@ -5305,7 +5312,7 @@ void nsWindow::OnCompositedChanged() {
   // Update CSD after the change in alpha visibility. This only affects
   // system metrics, not other theme shenanigans.
   NotifyThemeChanged(ThemeChangeKind::MediaQueriesOnly);
-  mCompositedScreen = gdk_screen_is_composited(gdk_screen_get_default());
+  mCompositedScreen = ScreenHelperGTK::IsComposited();
 }
 
 // X11(XWayland) and Wayland handles screen scale differently.
@@ -5333,7 +5340,7 @@ void nsWindow::OnScaleEvent() {
   }
 
   LOG("nsWindow::OnScaleEvent() GdkWindow scale %d",
-      gdk_window_get_scale_factor(mGdkWindow));
+      gdk_surface_get_scale_factor(mGdkWindow));
 
   RefreshScale(/* aRefreshScreen */ true);
 }
@@ -5344,18 +5351,18 @@ void nsWindow::RefreshScale(bool aRefreshScreen) {
   }
 
   LOG("nsWindow::RefreshScale() GdkWindow scale %d refresh %d",
-      gdk_window_get_scale_factor(mGdkWindow), aRefreshScreen);
+      gdk_surface_get_scale_factor(mGdkWindow), aRefreshScreen);
 
 #ifdef MOZ_WAYLAND
   if (GdkIsWaylandDisplay()) {
     WaylandSurfaceLock lock(mSurface);
     mSurface->SetCeiledScaleLocked(lock,
-                                   gdk_window_get_scale_factor(mGdkWindow));
+                                   gdk_surface_get_scale_factor(mGdkWindow));
   }
 #endif
 
   MOZ_DIAGNOSTIC_ASSERT(mIsMapped && mGdkWindow);
-  int ceiledScale = gdk_window_get_scale_factor(mGdkWindow);
+  int ceiledScale = gdk_surface_get_scale_factor(mGdkWindow);
   bool scaleChanged = (mCeiledScaleFactor != ceiledScale);
   if (!scaleChanged) {
     return;
@@ -5416,7 +5423,7 @@ void nsWindow::DispatchDragEvent(EventMessage aMsg,
 
   DispatchInputEvent(&event);
 }
-
+/*
 void nsWindow::OnDragDataReceivedEvent(GtkWidget* aWidget,
                                        GdkDragContext* aDragContext, gint aX,
                                        gint aY,
@@ -5434,7 +5441,7 @@ void nsWindow::OnDragDataReceivedEvent(GtkWidget* aWidget,
                                     aSelectionData, aInfo, aTime);
   }
 }
-
+*/
 nsWindow* nsWindow::GetTransientForWindowIfPopup() {
   if (mWindowType != WindowType::Popup) {
     return nullptr;
@@ -5450,7 +5457,7 @@ bool nsWindow::IsHandlingTouchSequence(GdkEventSequence* aSequence) {
   return mHandleTouchEvent && mTouches.Contains(aSequence);
 }
 
-gboolean nsWindow::OnTouchpadPinchEvent(GdkEventTouchpadPinch* aEvent) {
+gboolean nsWindow::OnTouchpadPinchEvent(GdkTouchpadEvent* aGdkEvent) {
   if (!StaticPrefs::apz_gtk_touchpad_pinch_enabled()) {
     return TRUE;
   }
@@ -5458,7 +5465,7 @@ gboolean nsWindow::OnTouchpadPinchEvent(GdkEventTouchpadPinch* aEvent) {
   // unless specifically preffed on. These are sometimes hooked up to other
   // actions at the desktop environment level and having the browser also
   // pinch can be undesirable.
-  if (aEvent->n_fingers > 2 &&
+  if (gdk_touchpad_event_get_n_fingers(GDK_EVENT(aGdkEvent)) > 2 &&
       !StaticPrefs::apz_gtk_touchpad_pinch_three_fingers_enabled()) {
     return FALSE;
   }
@@ -5466,12 +5473,12 @@ gboolean nsWindow::OnTouchpadPinchEvent(GdkEventTouchpadPinch* aEvent) {
   ScreenCoord currentSpan;
   ScreenCoord previousSpan;
 
-  switch (aEvent->phase) {
+  switch (gdk_touchpad_event_get_gesture_phase(GDK_EVENT(aGdkEvent))) {
     case GDK_TOUCHPAD_GESTURE_PHASE_BEGIN:
       pinchGestureType = PinchGestureInput::PINCHGESTURE_START;
-      currentSpan = aEvent->scale;
+      currentSpan = gdk_touchpad_event_get_pinch_scale(GDK_EVENT(aGdkEvent));
       mCurrentTouchpadFocus = ViewAs<ScreenPixel>(
-          GetRefPoint(this, aEvent),
+          GetRefPoint(this, aGdkEvent),
           PixelCastJustification::LayoutDeviceIsScreenForUntransformedEvent);
 
       // Assign PreviousSpan --> 0.999 to make mDeltaY field of the
@@ -5483,17 +5490,19 @@ gboolean nsWindow::OnTouchpadPinchEvent(GdkEventTouchpadPinch* aEvent) {
 
     case GDK_TOUCHPAD_GESTURE_PHASE_UPDATE:
       pinchGestureType = PinchGestureInput::PINCHGESTURE_SCALE;
-      mCurrentTouchpadFocus += ScreenPoint(aEvent->dx, aEvent->dy);
-      if (aEvent->scale == mLastPinchEventSpan) {
+      double dx, dy;
+      gdk_scroll_event_get_deltas(GDK_EVENT(aGdkEvent), &dx, &dy);
+      mCurrentTouchpadFocus += ScreenPoint(dx, dy);
+      if (gdk_touchpad_event_get_pinch_scale(GDK_EVENT(aGdkEvent)) == mLastPinchEventSpan) {
         return FALSE;
       }
-      currentSpan = aEvent->scale;
+      currentSpan = gdk_touchpad_event_get_pinch_scale(GDK_EVENT(aGdkEvent));
       previousSpan = mLastPinchEventSpan;
       break;
 
     case GDK_TOUCHPAD_GESTURE_PHASE_END:
       pinchGestureType = PinchGestureInput::PINCHGESTURE_END;
-      currentSpan = aEvent->scale;
+      currentSpan = gdk_touchpad_event_get_pinch_scale(GDK_EVENT(aGdkEvent));
       previousSpan = mLastPinchEventSpan;
       break;
 
@@ -5503,21 +5512,21 @@ gboolean nsWindow::OnTouchpadPinchEvent(GdkEventTouchpadPinch* aEvent) {
 
   PinchGestureInput event(
       pinchGestureType, PinchGestureInput::TRACKPAD,
-      GetEventTimeStamp(aEvent->time), ExternalPoint(0, 0),
+      GetEventTimeStamp(gdk_event_get_time(GDK_EVENT(aGdkEvent))), ExternalPoint(0, 0),
       mCurrentTouchpadFocus,
-      100.0 * ((aEvent->phase == GDK_TOUCHPAD_GESTURE_PHASE_END)
+      100.0 * ((gdk_touchpad_event_get_gesture_phase(GDK_EVENT(aGdkEvent)) == GDK_TOUCHPAD_GESTURE_PHASE_END)
                    ? ScreenCoord(1.f)
                    : currentSpan),
-      100.0 * ((aEvent->phase == GDK_TOUCHPAD_GESTURE_PHASE_END)
+      100.0 * ((gdk_touchpad_event_get_gesture_phase(GDK_EVENT(aGdkEvent)) == GDK_TOUCHPAD_GESTURE_PHASE_END)
                    ? ScreenCoord(1.f)
                    : previousSpan),
-      KeymapWrapper::ComputeKeyModifiers(aEvent->state));
+      KeymapWrapper::ComputeKeyModifiers(gdk_event_get_modifier_state(GDK_EVENT(aGdkEvent))));
 
   if (!event.SetLineOrPageDeltaY(this)) {
     return FALSE;
   }
 
-  mLastPinchEventSpan = aEvent->scale;
+  mLastPinchEventSpan = gdk_touchpad_event_get_pinch_scale(GDK_EVENT(aGdkEvent));
   DispatchPinchGestureInput(event);
   return TRUE;
 }
@@ -5543,30 +5552,35 @@ void nsWindow::OnTouchpadHoldEvent(GdkTouchpadGesturePhase aPhase, guint aTime,
   DispatchPanGesture(panEvent);
 }
 
-gboolean nsWindow::OnTouchEvent(GdkEventTouch* aEvent) {
-  LOG("OnTouchEvent: x=%f y=%f type=%d\n", aEvent->x, aEvent->y, aEvent->type);
+gboolean nsWindow::OnTouchEvent(GdkTouchEvent* aGdkEvent) {
+  double pos_x, pos_y;
+  gdk_event_get_position(GDK_EVENT(aGdkEvent), &pos_x, &pos_y);
+  guint32 time = gdk_event_get_time(GDK_EVENT(aGdkEvent));
+  GdkEventType type = gdk_event_get_event_type(GDK_EVENT(aGdkEvent));
+  GdkModifierType state = gdk_event_get_modifier_state(GDK_EVENT(aGdkEvent));
+  LOG("OnTouchEvent: x=%f y=%f type=%d\n", pos_x, pos_y, type);
   if (!mHandleTouchEvent) {
     // If a popup window was spawned (e.g. as the result of a long-press)
     // and touch events got diverted to that window within a touch sequence,
     // ensure the touch event gets sent to the original window instead. We
     // keep the checks here very conservative so that we only redirect
     // events in this specific scenario.
-    nsWindow* targetWindow = GetTransientForWindowIfPopup();
-    if (targetWindow &&
-        targetWindow->IsHandlingTouchSequence(aEvent->sequence)) {
-      return targetWindow->OnTouchEvent(aEvent);
-    }
+    //nsWindow* targetWindow = GetTransientForWindowIfPopup();
+    //if (targetWindow &&
+    //    targetWindow->IsHandlingTouchSequence(aEvent->sequence)) {
+    //  return targetWindow->OnTouchEvent(aGdkEvent);
+    //}
 
     return FALSE;
   }
 
   EventMessage msg;
-  switch (aEvent->type) {
+  switch (type) {
     case GDK_TOUCH_BEGIN:
       // check to see if we should rollup
-      if (CheckForRollup(aEvent->x_root, aEvent->y_root, false, false)) {
-        return FALSE;
-      }
+      //if (CheckForRollup(aEvent->x_root, aEvent->y_root, false, false)) {
+      //  return FALSE;
+      //}
       msg = eTouchStart;
       break;
     case GDK_TOUCH_UPDATE:
@@ -5575,13 +5589,13 @@ gboolean nsWindow::OnTouchEvent(GdkEventTouch* aEvent) {
       if (mWindowShouldStartDragging) {
         mWindowShouldStartDragging = false;
         if (mGdkWindow) {
-          GdkWindow* gdk_window = gdk_window_get_toplevel(mGdkWindow);
+          GdkSurface* gdk_window = GetSurfaceFromWidget(mShell);
           MOZ_ASSERT(gdk_window,
                      "gdk_window_get_toplevel should not return null");
 
           LOG("  start window dragging window\n");
-          gdk_window_begin_move_drag(gdk_window, 1, aEvent->x_root,
-                                     aEvent->y_root, aEvent->time);
+          //gdk_window_begin_move_drag(gdk_window, 1, aEvent->x_root,
+          //                           aEvent->y_root, aEvent->time);
 
           // Cancel the event sequence. gdk will steal all subsequent events
           // (including TOUCH_END).
@@ -5603,22 +5617,22 @@ gboolean nsWindow::OnTouchEvent(GdkEventTouch* aEvent) {
       return FALSE;
   }
 
-  const LayoutDeviceIntPoint touchPoint = GetRefPoint(this, aEvent);
+  const LayoutDeviceIntPoint touchPoint = GetRefPoint(this, aGdkEvent);
 
   int32_t id;
-  RefPtr<dom::Touch> touch;
-  if (mTouches.Remove(aEvent->sequence, getter_AddRefs(touch))) {
-    id = touch->mIdentifier;
-  } else {
-    id = ++gLastTouchID & 0x7FFFFFFF;
-  }
+  //RefPtr<dom::Touch> touch;
+  //if (mTouches.Remove(aEvent->sequence, getter_AddRefs(touch))) {
+  //  id = touch->mIdentifier;
+  //} else {
+  //  id = ++gLastTouchID & 0x7FFFFFFF;
+  //}
 
-  touch =
-      new dom::Touch(id, touchPoint, LayoutDeviceIntPoint(1, 1), 0.0f, 0.0f);
+  //touch =
+  //    new dom::Touch(id, touchPoint, LayoutDeviceIntPoint(1, 1), 0.0f, 0.0f);
 
   WidgetTouchEvent event(true, msg, this);
-  KeymapWrapper::InitInputEvent(event, aEvent->state);
-
+  KeymapWrapper::InitInputEvent(event, state);
+  /*
   if (msg == eTouchStart || msg == eTouchMove) {
     mTouches.InsertOrUpdate(aEvent->sequence, std::move(touch));
     // add all touch points to event object
@@ -5628,7 +5642,7 @@ gboolean nsWindow::OnTouchEvent(GdkEventTouch* aEvent) {
   } else if (msg == eTouchEnd || msg == eTouchCancel) {
     *event.mTouches.AppendElement() = std::move(touch);
   }
-
+  */
   nsIWidget::ContentAndAPZEventStatus eventStatus = DispatchInputEvent(&event);
 
   // There's a chance that we are in drag area and the event is not consumed
@@ -5647,7 +5661,7 @@ bool nsWindow::IsToplevelWindowTransparent() {
   static bool transparencyConfigured = false;
 
   if (!transparencyConfigured) {
-    if (gdk_screen_is_composited(gdk_screen_get_default())) {
+    if (gdk_display_is_composited(gdk_display_get_default())) {
       // Some Gtk+ themes use non-rectangular toplevel windows. To fully
       // support such themes we need to make toplevel window transparent
       // with ARGB visual.
@@ -5746,16 +5760,16 @@ nsCString nsWindow::GetPopupTypeName() {
 // to the widget.
 static void GtkWidgetDisableUpdates(GtkWidget* aWidget) {
   // Clear exposure mask - it disabled synthesized events.
-  GdkWindow* window = gtk_widget_get_window(aWidget);
+  GdkSurface* window = gtk_native_get_surface(GTK_NATIVE(gtk_widget_get_native(aWidget)));
   if (!window) {
     return;
   }
-  gdk_window_set_events(window, (GdkEventMask)(gdk_window_get_events(window) &
-                                               (~GDK_EXPOSURE_MASK)));
+  //gdk_window_set_events(window, (GdkEventMask)(gdk_window_get_events(window) &
+  //                                             (~GDK_EXPOSURE_MASK)));
 
   // Remove before/after paint handles from frame clock.
   // It disables widget content updates.
-  GdkFrameClock* frame_clock = gdk_window_get_frame_clock(window);
+  GdkFrameClock* frame_clock = gdk_surface_get_frame_clock(window);
   g_signal_handlers_disconnect_by_data(frame_clock, window);
 }
 
@@ -5771,7 +5785,7 @@ Window nsWindow::GetX11Window() {
 void nsWindow::EnsureGdkWindow() {
   MOZ_DIAGNOSTIC_ASSERT(mIsMapped);
   if (!mGdkWindow) {
-    mGdkWindow = gtk_widget_get_window(GTK_WIDGET(mContainer));
+    mGdkWindow = GetSurfaceFromWidget(GTK_WIDGET(mContainer));
     g_object_set_data(G_OBJECT(mGdkWindow), "nsWindow", this);
   }
 }
@@ -5889,15 +5903,15 @@ nsresult nsWindow::Create(nsIWidget* aParent, const LayoutDeviceIntRect& aRect,
   // window manager, as indicated by GTK_WINDOW_TOPLEVEL.
   // For Wayland we have to always use GTK_WINDOW_POPUP to control
   // popup window position.
-  GtkWindowType type = GTK_WINDOW_TOPLEVEL;
-  if (mWindowType == WindowType::Popup) {
-    MOZ_ASSERT(aInitData);
-    type = GTK_WINDOW_POPUP;
-    if (GdkIsX11Display() && mNoAutoHide) {
-      type = GTK_WINDOW_TOPLEVEL;
-    }
-  }
-  mShell = gtk_window_new(type);
+  //GtkWindowType type = GTK_WINDOW_TOPLEVEL;
+  //if (mWindowType == WindowType::Popup) {
+  //  MOZ_ASSERT(aInitData);
+  //  type = GTK_WINDOW_POPUP;
+  //  if (GdkIsX11Display() && mNoAutoHide) {
+  //    type = GTK_WINDOW_TOPLEVEL;
+  //  }
+  //}
+  mShell = gtk_window_new();
 
   // It is important that this happens before the realize() call below, so that
   // we don't get bogus CSD margins on Wayland, see bug 1794577.
@@ -5933,15 +5947,15 @@ nsresult nsWindow::Create(nsIWidget* aParent, const LayoutDeviceIntRect& aRect,
     // We're running on composited screen so we can use alpha visual
     // for both toplevel and popups.
     if (mCompositedScreen) {
-      GdkVisual* visual =
-          gdk_screen_get_rgba_visual(gtk_widget_get_screen(mShell));
-      if (visual) {
-        gtk_widget_set_visual(mShell, visual);
+      //GdkVisual* visual =
+      //    gdk_screen_get_rgba_visual(gtk_widget_get_screen(mShell));
+      //if (visual) {
+        //gtk_widget_set_visual(mShell, visual);
         mHasAlphaVisual = true;
-      }
-    } else {
+      //}
+    //} else {
       // We can't really provide transparency...
-      mIsTransparent = false;
+      //mIsTransparent = false;
     }
   }
 
@@ -5960,21 +5974,21 @@ nsresult nsWindow::Create(nsIWidget* aParent, const LayoutDeviceIntRect& aRect,
     GdkRectangle size = DevicePixelsToGdkSizeRoundUp(mBounds.Size());
     LOG("  nsWindow::Create() Initial resize to %d x %d\n", size.width,
         size.height);
-    gtk_window_resize(GTK_WINDOW(mShell), size.width, size.height);
+    //gtk_window_resize(GTK_WINDOW(mShell), size.width, size.height);
   }
   if (mIsPIPWindow) {
     LOG("  Is PIP window\n");
-    gtk_window_set_type_hint(GTK_WINDOW(mShell), GDK_WINDOW_TYPE_HINT_UTILITY);
+    //gtk_window_set_type_hint(GTK_WINDOW(mShell), GDK_WINDOW_TYPE_HINT_UTILITY);
   } else if (mIsAlert) {
     LOG("  Is alert window\n");
-    gtk_window_set_type_hint(GTK_WINDOW(mShell),
-                             GDK_WINDOW_TYPE_HINT_NOTIFICATION);
-    gtk_window_set_skip_taskbar_hint(GTK_WINDOW(mShell), TRUE);
+    //gtk_window_set_type_hint(GTK_WINDOW(mShell),
+    //                         GDK_WINDOW_TYPE_HINT_NOTIFICATION);
+    //gtk_window_set_skip_taskbar_hint(GTK_WINDOW(mShell), TRUE);
   } else if (mWindowType == WindowType::Dialog) {
     mGtkWindowRoleName = "Dialog";
 
     SetDefaultIcon();
-    gtk_window_set_type_hint(GTK_WINDOW(mShell), GDK_WINDOW_TYPE_HINT_DIALOG);
+    //gtk_window_set_type_hint(GTK_WINDOW(mShell), GDK_WINDOW_TYPE_HINT_DIALOG);
     LOG("  nsWindow::Create(): dialog");
     if (parentnsWindow) {
       GtkWindowSetTransientFor(GTK_WINDOW(mShell),
@@ -6000,11 +6014,11 @@ nsresult nsWindow::Create(nsIWidget* aParent, const LayoutDeviceIntRect& aRect,
                                    bool(mBorderStyle & BorderStyle::Close));
         }
       }
-      gtk_window_set_skip_taskbar_hint(GTK_WINDOW(mShell), TRUE);
+      //gtk_window_set_skip_taskbar_hint(GTK_WINDOW(mShell), TRUE);
       // Element focus is managed by the parent window so the
       // WM_HINTS input field is set to False to tell the window
       // manager not to set input focus to this window ...
-      gtk_window_set_accept_focus(GTK_WINDOW(mShell), FALSE);
+      gtk_widget_set_can_focus(mShell, FALSE);
 #ifdef MOZ_X11
       // ... but when the window manager offers focus through
       // WM_TAKE_FOCUS, focus is requested on the parent window.
@@ -6017,25 +6031,25 @@ nsresult nsWindow::Create(nsIWidget* aParent, const LayoutDeviceIntRect& aRect,
     }
 
     if (aInitData->mIsDragPopup) {
-      gtk_window_set_type_hint(GTK_WINDOW(mShell), GDK_WINDOW_TYPE_HINT_DND);
+      //gtk_window_set_type_hint(GTK_WINDOW(mShell), GDK_WINDOW_TYPE_HINT_DND);
       mIsDragPopup = true;
       LOG("  nsWindow::Create() Drag popup\n");
     } else if (GdkIsX11Display()) {
       // Set the window hints on X11 only. Wayland popups are configured
       // at WaylandPopupConfigure().
-      GdkWindowTypeHint gtkTypeHint;
-      switch (mPopupType) {
-        case PopupType::Menu:
-          gtkTypeHint = GDK_WINDOW_TYPE_HINT_POPUP_MENU;
-          break;
-        case PopupType::Tooltip:
-          gtkTypeHint = GDK_WINDOW_TYPE_HINT_TOOLTIP;
-          break;
-        default:
-          gtkTypeHint = GDK_WINDOW_TYPE_HINT_UTILITY;
-          break;
-      }
-      gtk_window_set_type_hint(GTK_WINDOW(mShell), gtkTypeHint);
+      //GdkWindowTypeHint gtkTypeHint;
+      //switch (mPopupType) {
+      //  case PopupType::Menu:
+      //    gtkTypeHint = GDK_WINDOW_TYPE_HINT_POPUP_MENU;
+      //    break;
+      //  case PopupType::Tooltip:
+      //    gtkTypeHint = GDK_WINDOW_TYPE_HINT_TOOLTIP;
+      //    break;
+      //    default:
+      //    gtkTypeHint = GDK_WINDOW_TYPE_HINT_UTILITY;
+      //    break;
+      //}
+      //gtk_window_set_type_hint(GTK_WINDOW(mShell), gtkTypeHint);
       LOG("  nsWindow::Create() popup type %s", GetPopupTypeName().get());
     }
     if (parentnsWindow) {
@@ -6076,7 +6090,7 @@ nsresult nsWindow::Create(nsIWidget* aParent, const LayoutDeviceIntRect& aRect,
   }
 
   if (mAlwaysOnTop) {
-    gtk_window_set_keep_above(GTK_WINDOW(mShell), TRUE);
+    gtk_window_set_modal(GTK_WINDOW(mShell), TRUE);
   }
 
   GtkWidget* container = nullptr;
@@ -6098,30 +6112,30 @@ nsresult nsWindow::Create(nsIWidget* aParent, const LayoutDeviceIntRect& aRect,
   g_object_set_data(G_OBJECT(mContainer), "nsWindow", this);
 
   // Prevent GtkWindow from painting a background to avoid flickering.
-  gtk_widget_set_app_paintable(
-      GTK_WIDGET(mContainer),
-      StaticPrefs::widget_transparent_windows_AtStartup());
+  //gtk_widget_set_app_paintable(
+  //    GTK_WIDGET(mContainer),
+  //    StaticPrefs::widget_transparent_windows_AtStartup());
 
-  gtk_widget_add_events(GTK_WIDGET(mContainer), kEvents);
-  gtk_widget_add_events(mShell, GDK_PROPERTY_CHANGE_MASK);
-  gtk_widget_set_app_paintable(
-      mShell, StaticPrefs::widget_transparent_windows_AtStartup());
+  //gtk_widget_add_events(GTK_WIDGET(mContainer), kEvents);
+  //gtk_widget_add_events(mShell, GDK_PROPERTY_CHANGE_MASK);
+  //gtk_widget_set_app_paintable(
+  //    mShell, StaticPrefs::widget_transparent_windows_AtStartup());
 
   // If we draw to mContainer window then configure it now because
   // gtk_container_add() realizes the child widget.
-  gtk_widget_set_has_window(container, true);
-  gtk_container_add(GTK_CONTAINER(mShell), container);
+  //gtk_widget_set_has_window(container, true);
+  gtk_window_set_child(GTK_WINDOW(mShell), container);
 
   // alwaysontop windows are generally used for peripheral indicators,
   // so we don't focus them by default.
   if (mAlwaysOnTop) {
-    gtk_window_set_focus_on_map(GTK_WINDOW(mShell), FALSE);
+    //gtk_window_set_focus_on_map(GTK_WINDOW(mShell), FALSE);
   }
 
   gtk_widget_realize(container);
 
   // make sure this is the focus widget in the container
-  gtk_widget_show(container);
+  gtk_widget_set_visible(container, true);
 
   if (!mAlwaysOnTop) {
     gtk_widget_grab_focus(container);
@@ -6157,49 +6171,55 @@ nsresult nsWindow::Create(nsIWidget* aParent, const LayoutDeviceIntRect& aRect,
   }
 
   if (mIsChildWindow && parentnsWindow) {
-    GdkWindow* window = GetToplevelGdkWindow();
-    GdkWindow* parentWindow = parentnsWindow->GetToplevelGdkWindow();
+    GdkSurface* window = GetToplevelSurface();
+    GdkSurface* parentWindow = parentnsWindow->GetToplevelSurface();
     LOG("  child GdkWindow %p set parent GdkWindow %p", window, parentWindow);
-    gdk_window_reparent(window, parentWindow,
-                        DevicePixelsToGdkCoordRoundDown(mBounds.x),
-                        DevicePixelsToGdkCoordRoundDown(mBounds.y));
+    //gdk_window_reparent(window, parentWindow,
+    //                    DevicePixelsToGdkCoordRoundDown(mBounds.x),
+    //                    DevicePixelsToGdkCoordRoundDown(mBounds.y));
   }
 
   // Also label mShell toplevel window,
   // property_notify_event_cb callback also needs to find its way home
-  g_object_set_data(G_OBJECT(GetToplevelGdkWindow()), "nsWindow", this);
+  g_object_set_data(G_OBJECT(GetToplevelSurface()), "nsWindow", this);
   g_object_set_data(G_OBJECT(mShell), "nsWindow", this);
 
-  // attach listeners for events
-  g_signal_connect(mShell, "configure_event", G_CALLBACK(configure_event_cb),
-                   nullptr);
-  g_signal_connect(mShell, "delete_event", G_CALLBACK(delete_event_cb),
-                   nullptr);
-  g_signal_connect(mShell, "window_state_event",
-                   G_CALLBACK(window_state_event_cb), nullptr);
-  g_signal_connect(mShell, "visibility-notify-event",
-                   G_CALLBACK(visibility_notify_event_cb), nullptr);
-  g_signal_connect(mShell, "check-resize", G_CALLBACK(check_resize_cb),
-                   nullptr);
-  g_signal_connect(mShell, "composited-changed",
-                   G_CALLBACK(widget_composited_changed_cb), nullptr);
-  g_signal_connect(mShell, "property-notify-event",
-                   G_CALLBACK(property_notify_event_cb), nullptr);
-
-  if (mWindowType == WindowType::TopLevel) {
-    g_signal_connect_after(mShell, "size_allocate",
-                           G_CALLBACK(toplevel_window_size_allocate_cb),
-                           nullptr);
-  }
-
-  GdkScreen* screen = gtk_widget_get_screen(mShell);
-  if (!g_signal_handler_find(screen, G_SIGNAL_MATCH_FUNC, 0, 0, nullptr,
-                             FuncToGpointer(screen_composited_changed_cb),
+  // Settings events
+  GtkSettings* default_settings = gtk_settings_get_default();
+  g_signal_connect_after(default_settings, "notify::gtk-xft-dpi",
+                         G_CALLBACK(settings_xft_dpi_changed_cb), this);
+  // Display events
+  GdkDisplay* display = gtk_widget_get_display(mShell);
+  if (!g_signal_handler_find(display, G_SIGNAL_MATCH_FUNC, 0, 0, nullptr,
+                             FuncToGpointer(display_composited_changed_cb),
                              nullptr)) {
-    g_signal_connect(screen, "composited-changed",
-                     G_CALLBACK(screen_composited_changed_cb), nullptr);
+    g_signal_connect(display, "notify::composited",
+                     G_CALLBACK(display_composited_changed_cb), nullptr);
   }
 
+  // Main window events
+  g_signal_connect(mShell, "destroy", G_CALLBACK(widget_destroy_cb), nullptr);
+  //g_signal_connect(mShell, "configure_event", G_CALLBACK(configure_event_cb),
+  //                 nullptr);
+  //g_signal_connect(mShell, "delete_event", G_CALLBACK(delete_event_cb),
+  //                 nullptr);
+  //g_signal_connect(mShell, "window_state_event",
+  //                 G_CALLBACK(window_state_event_cb), nullptr);
+  //g_signal_connect(mShell, "visibility-notify-event",
+  //                 G_CALLBACK(visibility_notify_event_cb), nullptr);
+  //g_signal_connect(mShell, "check-resize", G_CALLBACK(check_resize_cb),
+  //                 nullptr);
+  //g_signal_connect(mShell, "composited-changed",
+  //                 G_CALLBACK(widget_composited_changed_cb), nullptr);
+  //g_signal_connect(mShell, "property-notify-event",
+  //                 G_CALLBACK(property_notify_event_cb), nullptr);
+  //if (mWindowType == WindowType::TopLevel) {
+  //  g_signal_connect_after(mShell, "size_allocate",
+  //                         G_CALLBACK(toplevel_window_size_allocate_cb),
+  //                         nullptr);
+  //}
+
+  /*
   gtk_drag_dest_set((GtkWidget*)mShell, (GtkDestDefaults)0, nullptr, 0,
                     (GdkDragAction)0);
   g_signal_connect(mShell, "drag_motion", G_CALLBACK(drag_motion_event_cb),
@@ -6210,16 +6230,13 @@ nsresult nsWindow::Create(nsIWidget* aParent, const LayoutDeviceIntRect& aRect,
                    nullptr);
   g_signal_connect(mShell, "drag_data_received",
                    G_CALLBACK(drag_data_received_event_cb), nullptr);
+  */
 
-  GtkSettings* default_settings = gtk_settings_get_default();
-  g_signal_connect_after(default_settings, "notify::gtk-xft-dpi",
-                         G_CALLBACK(settings_xft_dpi_changed_cb), this);
-
-  // Widget signals
-  g_signal_connect_after(mContainer, "size_allocate",
-                         G_CALLBACK(size_allocate_cb), nullptr);
-  g_signal_connect(mContainer, "hierarchy-changed",
-                   G_CALLBACK(hierarchy_changed_cb), nullptr);
+  // Mozcontainer events
+  //g_signal_connect_after(mContainer, "size_allocate",
+  //                       G_CALLBACK(size_allocate_cb), nullptr);
+  //g_signal_connect(mContainer, "hierarchy-changed",
+  //                 G_CALLBACK(hierarchy_changed_cb), nullptr);
   g_signal_connect(mContainer, "notify::scale-factor",
                    G_CALLBACK(scale_changed_cb), nullptr);
 
@@ -6229,16 +6246,65 @@ nsresult nsWindow::Create(nsIWidget* aParent, const LayoutDeviceIntRect& aRect,
   // widgets.
   g_signal_connect(G_OBJECT(mContainer), "draw", G_CALLBACK(expose_event_cb),
                    nullptr);
-  g_signal_connect(mContainer, "focus_in_event", G_CALLBACK(focus_in_event_cb),
-                   nullptr);
-  g_signal_connect(mContainer, "focus_out_event",
-                   G_CALLBACK(focus_out_event_cb), nullptr);
-  g_signal_connect(mContainer, "key_press_event",
+  //GtkEventController* controller_focus = gtk_event_controller_focus_new();
+  //gtk_widget_add_controller(GTK_WIDGET(mContainer), controller_focus);
+  //g_signal_connect(mContainer, "enter", G_CALLBACK(focus_in_event_cb),
+  //                 nullptr);
+  //g_signal_connect(mContainer, "leave", G_CALLBACK(focus_out_event_cb),
+  //                 nullptr);
+  // Keyboard
+  GtkEventController* controller_key = gtk_event_controller_key_new();
+  gtk_widget_add_controller(GTK_WIDGET(mContainer), controller_key);
+  g_signal_connect(mContainer, "key-pressed",
                    G_CALLBACK(key_press_event_cb), nullptr);
-  g_signal_connect(mContainer, "key_release_event",
+  g_signal_connect(mContainer, "key-released",
                    G_CALLBACK(key_release_event_cb), nullptr);
-
-  g_signal_connect(mShell, "destroy", G_CALLBACK(widget_destroy_cb), nullptr);
+  // A popup attached to a modal parent window doesn't get mouse events
+  // from Gtk as they'are directed to the modal parent. This is usually solved
+  // by pointer grab which that doesn't work on Wayland in our current
+  // setup as it performs show and grab in one step.
+  //
+  // We emulate it by setting popup as modal too but then patent
+  // window doesn't get mouse events outside of popup (Bug 1899299).
+  // we need to listen
+  //
+  // Surprisingly attaching events handler to mShell fixes it
+  // and we're getting events from both parent and popup windows.
+  GtkWidget* eventWidget = (mWindowType == WindowType::Popup &&
+                            gtk_window_get_modal(GTK_WINDOW(mShell)))
+                               ? mShell
+                               : GTK_WIDGET(mContainer);
+  // Pointer
+  GtkEventController* controller_motion = gtk_event_controller_motion_new();
+  gtk_widget_add_controller(eventWidget, controller_motion);
+  g_signal_connect(eventWidget, "enter",
+                   G_CALLBACK(enter_notify_event_cb), nullptr);
+  g_signal_connect(eventWidget, "leave",
+                   G_CALLBACK(leave_notify_event_cb), nullptr);
+  g_signal_connect(eventWidget, "motion",
+                   G_CALLBACK(motion_notify_event_cb), nullptr);
+  // Button
+  GtkGesture* gesture_click = gtk_gesture_click_new();
+  gtk_widget_add_controller(eventWidget, GTK_EVENT_CONTROLLER(gesture_click));
+  g_signal_connect(eventWidget, "pressed",
+                   G_CALLBACK(button_press_event_cb), nullptr);
+  g_signal_connect(eventWidget, "released",
+                   G_CALLBACK(button_release_event_cb), nullptr);
+  // Scroll
+  GtkEventController* controller_scroll = gtk_event_controller_scroll_new(
+    GtkEventControllerScrollFlags(GTK_EVENT_CONTROLLER_SCROLL_VERTICAL |
+                                  GTK_EVENT_CONTROLLER_SCROLL_HORIZONTAL));
+  gtk_widget_add_controller(eventWidget, controller_scroll);
+  g_signal_connect(eventWidget, "scroll", G_CALLBACK(scroll_event_cb),
+                   nullptr);
+  // Swipe
+  GtkGesture* gesture_swipe = gtk_gesture_swipe_new();
+  gtk_widget_add_controller(eventWidget, GTK_EVENT_CONTROLLER(gesture_swipe));
+  g_signal_connect(eventWidget, "swipe", G_CALLBACK(touch_event_cb),
+                   nullptr);
+  // Generic events
+  //g_signal_connect(eventWidget, "event", G_CALLBACK(generic_event_cb),
+  //  nullptr);
 
 #ifdef MOZ_X11
   if (GdkIsX11Display()) {
@@ -6265,44 +6331,10 @@ nsresult nsWindow::Create(nsIWidget* aParent, const LayoutDeviceIntRect& aRect,
     mIMContext = new IMContextWrapper(this);
   }
 
-  // A popup attached to a modal parent window doesn't get mouse events
-  // from Gtk as they'are directed to the modal parent. This is usually solved
-  // by pointer grab which that doesn't work on Wayland in our current
-  // setup as it performs show and grab in one step.
-  //
-  // We emulate it by setting popup as modal too but then patent
-  // window doesn't get mouse events outside of popup (Bug 1899299).
-  // we need to listen
-  //
-  // Surprisingly attaching events handler to mShell fixes it
-  // and we're getting events from both parent and popup windows.
-  GtkWidget* eventWidget = (mWindowType == WindowType::Popup &&
-                            gtk_window_get_modal(GTK_WINDOW(mShell)))
-                               ? mShell
-                               : GTK_WIDGET(mContainer);
-  g_signal_connect(eventWidget, "enter-notify-event",
-                   G_CALLBACK(enter_notify_event_cb), nullptr);
-  g_signal_connect(eventWidget, "leave-notify-event",
-                   G_CALLBACK(leave_notify_event_cb), nullptr);
-  g_signal_connect(eventWidget, "motion-notify-event",
-                   G_CALLBACK(motion_notify_event_cb), nullptr);
-  g_signal_connect(eventWidget, "button-press-event",
-                   G_CALLBACK(button_press_event_cb), nullptr);
-  g_signal_connect(eventWidget, "button-release-event",
-                   G_CALLBACK(button_release_event_cb), nullptr);
-  g_signal_connect(eventWidget, "scroll-event", G_CALLBACK(scroll_event_cb),
-                   nullptr);
-  if (gtk_check_version(3, 18, 0) == nullptr) {
-    g_signal_connect(eventWidget, "event", G_CALLBACK(generic_event_cb),
-                     nullptr);
-  }
-  g_signal_connect(eventWidget, "touch-event", G_CALLBACK(touch_event_cb),
-                   nullptr);
-
   LOG("  nsWindow type %d %s\n", int(mWindowType),
       mIsPIPWindow ? "PIP window" : "");
   LOG("  mShell %p (window %p) mContainer %p mGdkWindow %p XID 0x%lx\n", mShell,
-      GetToplevelGdkWindow(), mContainer, mGdkWindow, GetX11Window());
+      GetToplevelSurface(), mContainer, mGdkWindow, GetX11Window());
 
   // Set default application name when it's empty.
   if (mGtkWindowAppName.IsEmpty()) {
@@ -6927,8 +6959,12 @@ bool nsWindow::DoDrawTilebarCorners() {
 
 GtkWidget* nsWindow::GetToplevelWidget() const { return mShell; }
 
-GdkWindow* nsWindow::GetToplevelGdkWindow() const {
-  return gtk_widget_get_window(mShell);
+GdkSurface* nsWindow::GetToplevelSurface() const {
+  return gtk_native_get_surface(mShell);
+}
+
+GdkSurface* nsWindow::GetSurfaceFromWidget(GtkWidget* aWidget) {
+  return gtk_native_get_surface(GTK_NATIVE(gtk_widget_get_native(aWidget)));
 }
 
 nsWindow* nsWindow::GetContainerWindow() const {
@@ -8260,7 +8296,7 @@ static void check_resize_cb(GtkContainer* container, gpointer user_data) {
   window->OnCheckResize();
 }
 
-static void screen_composited_changed_cb(GdkScreen* screen,
+static void display_composited_changed_cb(GdkDisplay* display,
                                          gpointer user_data) {
   // This callback can run before gfxPlatform::Init() in rare
   // cases involving the profile manager. When this happens,
