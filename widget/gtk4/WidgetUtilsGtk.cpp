@@ -344,7 +344,7 @@ RefPtr<FocusRequestPromise> RequestWaylandFocusPromise() {
     return nullptr;
   }
 
-  GdkSurface* gdkWindow = sourceWindow->GetToplevelGdkWindow();
+  GdkSurface* gdkWindow = sourceWindow->GetToplevelSurface();
   if (!gdkWindow) {
     return nullptr;
   }
