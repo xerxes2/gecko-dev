@@ -205,29 +205,33 @@ static void size_allocate_cb(GtkWidget* widget, GtkAllocation* allocation);
 static void toplevel_window_size_allocate_cb(GtkWidget* widget,
                                              GtkAllocation* allocation);
 static gboolean delete_event_cb(GtkWidget* widget, GdkEvent* event);
-static gboolean enter_notify_event_cb(GtkWidget* widget,
-                                      GdkCrossingEvent* event);
-static gboolean leave_notify_event_cb(GtkWidget* widget,
-                                      GdkCrossingEvent* event);
-static gboolean motion_notify_event_cb(GtkWidget* widget,
-                                       GdkMotionEvent* event);
-MOZ_CAN_RUN_SCRIPT static gboolean button_press_event_cb(GtkWidget* widget,
-                                                         GdkButtonEvent* event);
-static gboolean button_release_event_cb(GtkWidget* widget,
-                                        GdkButtonEvent* event);
-static gboolean focus_in_event_cb(GtkWidget* widget, GdkFocusEvent* event);
-static gboolean focus_out_event_cb(GtkWidget* widget, GdkFocusEvent* event);
-static gboolean key_press_event_cb(GtkWidget* widget, GdkKeyEvent* event);
-static gboolean key_release_event_cb(GtkWidget* widget, GdkKeyEvent* event);
+static gboolean enter_notify_event_cb(GtkEventControllerMotion* controller,
+                                      gdouble pos_x, gdouble pos_y);
+static gboolean leave_notify_event_cb(GtkEventControllerMotion* controller,
+                                      gdouble pos_x, gdouble pos_y);
+static gboolean motion_notify_event_cb(GtkEventControllerMotion* controller,
+                                      gdouble pos_x, gdouble pos_y);
+MOZ_CAN_RUN_SCRIPT static gboolean button_press_event_cb(GtkGestureClick* gesture, gint n_press,
+                                      gdouble pos_x, gdouble pos_y);
+static gboolean button_release_event_cb(GtkGestureClick* gesture, gint n_press,
+                                      gdouble pos_x, gdouble pos_y);
+static gboolean focus_in_event_cb(GtkEventControllerFocus* controller);
+static gboolean focus_out_event_cb(GtkEventControllerFocus* controller);
+static gboolean key_press_event_cb(GtkEventControllerKey* controller,
+                                   guint keyval, guint keycode,
+                                   GdkModifierType state);
+static gboolean key_release_event_cb(GtkEventControllerKey* controller,
+                                   guint keyval, guint keycode,
+                                   GdkModifierType state);
 //static gboolean property_notify_event_cb(GtkWidget* widget,
 //                                         GdkEventProperty* event);
-static gboolean scroll_event_cb(GtkWidget* widget, GdkScrollEvent* event);
+static gboolean scroll_event_cb(GtkEventControllerScroll* controller,
+                                gdouble dx, gdouble dy);
 //static gboolean visibility_notify_event_cb(GtkWidget* widget,
 //                                           GdkEventVisibility* event);
 static void hierarchy_changed_cb(GtkWidget* widget,
                                  GtkWidget* previous_toplevel);
-//static gboolean window_state_event_cb(GtkWidget* widget,
-//                                      GdkEventWindowState* event);
+static gboolean window_state_event_cb(GtkWidget* widget, GParamSpec* pspec);
 static void settings_xft_dpi_changed_cb(GtkSettings* settings,
                                         GParamSpec* pspec, nsWindow* data);
 static void check_resize_cb(GtkWidget* container, gpointer user_data);
@@ -4060,7 +4064,7 @@ void nsWindow::OnDeleteEvent() {
   if (mWidgetListener) mWidgetListener->RequestWindowClose(this);
 }
 
-void nsWindow::OnEnterNotifyEvent(GdkCrossingEvent* aEvent) {
+void nsWindow::OnEnterNotifyEvent(GdkEvent* aEvent) {
   //LOG("enter notify (win=%p, sub=%p): %f, %f mode %d, detail %d\n",
   //    aEvent->window, aEvent->subwindow, aEvent->x, aEvent->y, aEvent->mode,
   //    aEvent->detail);
@@ -4099,7 +4103,7 @@ void nsWindow::OnEnterNotifyEvent(GdkCrossingEvent* aEvent) {
 // with CSD, gdk_device_get_window_at_position could return the window even when
 // the pointer is in the decoration area.
 static bool IsBogusLeaveNotifyEvent(GdkSurface* aWindow,
-                                    GdkCrossingEvent* aEvent) {
+                                    GdkEvent* aEvent) {
   static bool sBogusWm = [] {
     if (GdkIsWaylandDisplay()) {
       return false;
@@ -4138,7 +4142,7 @@ static bool IsBogusLeaveNotifyEvent(GdkSurface* aWindow,
   return winAtPt == aWindow;
 }
 
-void nsWindow::OnLeaveNotifyEvent(GdkCrossingEvent* aEvent) {
+void nsWindow::OnLeaveNotifyEvent(GdkEvent* aEvent) {
   //LOG("leave notify (win=%p, sub=%p): %f, %f mode %d, detail %d\n",
   //    aEvent->window, aEvent->subwindow, aEvent->x, aEvent->y, aEvent->mode,
   //    aEvent->detail);
@@ -4256,7 +4260,7 @@ static LayoutDeviceIntPoint GetRefPoint(nsWindow* aWindow, Event* aEvent) {
          aWindow->WidgetToScreenOffset();
 }
 
-void nsWindow::EmulateResizeDrag(GdkMotionEvent* aEvent) {
+void nsWindow::EmulateResizeDrag(GdkEvent* aEvent) {
   double x, y;
   gdk_event_get_position(GDK_EVENT(aEvent), &x, &y);
   auto newPoint = LayoutDeviceIntPoint::Floor(x, y);
@@ -4276,7 +4280,7 @@ void nsWindow::EmulateResizeDrag(GdkMotionEvent* aEvent) {
   //gtk_window_resize(GTK_WINDOW(mShell), newSize.width, newSize.height);
 }
 
-void nsWindow::OnMotionNotifyEvent(GdkMotionEvent* aEvent) {
+void nsWindow::OnMotionNotifyEvent(GdkEvent* aEvent) {
   mLastMouseCoordinates.Set(aEvent);
 
   if (!mGdkWindow) {
@@ -4378,7 +4382,7 @@ void nsWindow::OnMotionNotifyEvent(GdkMotionEvent* aEvent) {
 // True as the ButtonRelease may be received on a foreign [plugin] window).
 // Use this method to check for released buttons when the pointer returns to a
 // Gecko window.
-void nsWindow::DispatchMissedButtonReleases(GdkCrossingEvent* aGdkEvent) {
+void nsWindow::DispatchMissedButtonReleases(GdkEvent* aGdkEvent) {
   guint changed = gdk_event_get_modifier_state(GDK_EVENT(aGdkEvent)) ^ gButtonState;
   // Only consider button releases.
   // (Ignore button presses that occurred outside Gecko.)
@@ -4419,7 +4423,7 @@ void nsWindow::DispatchMissedButtonReleases(GdkCrossingEvent* aGdkEvent) {
 }
 
 void nsWindow::InitButtonEvent(WidgetMouseEvent& aEvent,
-                               GdkButtonEvent* aGdkEvent,
+                               GdkEvent* aGdkEvent,
                                const LayoutDeviceIntPoint& aRefPoint) {
   aEvent.mRefPoint = aRefPoint;
 
@@ -4468,7 +4472,7 @@ static guint ButtonMaskFromGDKButton(guint button) {
 }
 
 void nsWindow::DispatchContextMenuEventFromMouseEvent(
-    uint16_t domButton, GdkButtonEvent* aEvent,
+    uint16_t domButton, GdkEvent* aEvent,
     const LayoutDeviceIntPoint& aRefPoint) {
   if (domButton == MouseButton::eSecondary && MOZ_LIKELY(!mIsDestroyed)) {
     WidgetPointerEvent contextMenuEvent(true, eContextMenu, this);
@@ -4478,14 +4482,14 @@ void nsWindow::DispatchContextMenuEventFromMouseEvent(
   }
 }
 
-void nsWindow::TryToShowNativeWindowMenu(GdkButtonEvent* aEvent) {
+void nsWindow::TryToShowNativeWindowMenu(GdkEvent* aEvent) {
   //if (!gdk_window_show_window_menu(GetToplevelGdkWindow(), (GdkEvent*)aEvent)) {
   //  NS_WARNING("Native context menu wasn't shown");
   //}
 }
 
 bool nsWindow::DoTitlebarAction(LookAndFeel::TitlebarEvent aEvent,
-                                GdkButtonEvent* aButtonEvent) {
+                                GdkEvent* aButtonEvent) {
   LOG("DoTitlebarAction %s click",
       aEvent == LookAndFeel::TitlebarEvent::Double_Click ? "double" : "middle");
   switch (LookAndFeel::GetTitlebarAction(aEvent)) {
@@ -4528,7 +4532,7 @@ bool nsWindow::DoTitlebarAction(LookAndFeel::TitlebarEvent aEvent,
   return true;
 }
 
-void nsWindow::OnButtonPressEvent(GdkButtonEvent* aGdkEvent) {
+void nsWindow::OnButtonPressEvent(GdkEvent* aGdkEvent) {
   LOG("Button %u press\n", gdk_button_event_get_button(GDK_EVENT(aGdkEvent)));
 
   SetLastMousePressEvent((GdkEvent*)aGdkEvent);
@@ -4670,7 +4674,7 @@ void nsWindow::OnButtonPressEvent(GdkButtonEvent* aGdkEvent) {
   }
 }
 
-void nsWindow::OnButtonReleaseEvent(GdkButtonEvent* aGdkEvent) {
+void nsWindow::OnButtonReleaseEvent(GdkEvent* aGdkEvent) {
   LOG("Button %u release\n", gdk_button_event_get_button(GDK_EVENT(aGdkEvent)));
 
   SetLastMousePressEvent(nullptr);
@@ -4747,7 +4751,7 @@ void nsWindow::OnButtonReleaseEvent(GdkButtonEvent* aGdkEvent) {
   }
 }
 
-void nsWindow::OnContainerFocusInEvent(GdkFocusEvent* aGdkEvent) {
+void nsWindow::OnContainerFocusInEvent(GdkEvent* aGdkEvent) {
   LOG("OnContainerFocusInEvent");
 
   // Unset the urgency hint, if possible
@@ -4780,7 +4784,7 @@ void nsWindow::OnContainerFocusInEvent(GdkFocusEvent* aGdkEvent) {
   LOG("Events sent from focus in event");
 }
 
-void nsWindow::OnContainerFocusOutEvent(GdkFocusEvent* aGdkEvent) {
+void nsWindow::OnContainerFocusOutEvent(GdkEvent* aGdkEvent) {
   LOG("OnContainerFocusOutEvent");
 
   if (IsTopLevelWidget()) {
@@ -4894,14 +4898,14 @@ mozilla::CurrentX11TimeGetter* nsWindow::GetCurrentTimeGetter() {
 }
 #endif
 
-gboolean nsWindow::OnKeyPressEvent(GdkKeyEvent* aGdkEvent) {
+gboolean nsWindow::OnKeyPressEvent(GdkEvent* aGdkEvent) {
   LOG("OnKeyPressEvent");
 
   KeymapWrapper::HandleKeyPressEvent(this, aGdkEvent);
   return TRUE;
 }
 
-gboolean nsWindow::OnKeyReleaseEvent(GdkKeyEvent* aGdkEvent) {
+gboolean nsWindow::OnKeyReleaseEvent(GdkEvent* aGdkEvent) {
   LOG("OnKeyReleaseEvent");
   if (NS_WARN_IF(!KeymapWrapper::HandleKeyReleaseEvent(this, aGdkEvent))) {
     return FALSE;
@@ -4909,7 +4913,7 @@ gboolean nsWindow::OnKeyReleaseEvent(GdkKeyEvent* aGdkEvent) {
   return TRUE;
 }
 
-void nsWindow::OnScrollEvent(GdkScrollEvent* aGdkEvent) {
+void nsWindow::OnScrollEvent(GdkEvent* aGdkEvent) {
   LOG("OnScrollEvent time %d", gdk_event_get_time(GDK_EVENT(aGdkEvent)));
 
   mLastMouseCoordinates.Set(aGdkEvent);
@@ -5142,12 +5146,13 @@ void nsWindow::OnVisibilityNotifyEvent(GdkVisibilityState aState) {
   NotifyOcclusionState(state);
 }
 */
-/*
-void nsWindow::OnWindowStateEvent(GtkWidget* aWidget,
-                                  GdkEventWindowState* aEvent) {
+
+void nsWindow::OnWindowStateEvent(GtkWidget* aWidget, GdkToplevelState state) {
+  auto oldState = mToplevelState;
+  mToplevelState = state;
   LOG("nsWindow::OnWindowStateEvent for %p changed 0x%x new_window_state "
       "0x%x\n",
-      aWidget, aEvent->changed_mask, aEvent->new_window_state);
+      aWidget, oldState, state);
 
   if (IS_MOZ_CONTAINER(aWidget)) {
     // This event is notifying the container widget of changes to the
@@ -5160,12 +5165,13 @@ void nsWindow::OnWindowStateEvent(GtkWidget* aWidget,
     // events are asynchronous.  The windows in the hierarchy now may not
     // be the same windows as when the toplevel was mapped, so they may
     // not get VisibilityNotify events.)
-    bool mapped = !(aEvent->new_window_state &
-                    (GDK_WINDOW_STATE_ICONIFIED | GDK_WINDOW_STATE_WITHDRAWN));
+    bool mapped = !(state &
+                    (GDK_TOPLEVEL_STATE_MINIMIZED | GDK_TOPLEVEL_STATE_SUSPENDED));
     SetHasMappedToplevel(mapped);
     LOG("\tquick return because IS_MOZ_CONTAINER(aWidget) is true\n");
     return;
   }
+  /*
   // else the widget is a shell widget.
 
   // The block below is a bit evil.
@@ -5293,8 +5299,9 @@ void nsWindow::OnWindowStateEvent(GtkWidget* aWidget,
   if (mWidgetListener && mSizeMode != oldSizeMode) {
     mWidgetListener->SizeModeChanged(mSizeMode);
   }
+  */
 }
-*/
+
 void nsWindow::OnDPIChanged() {
   // Update menu's font size etc.
   // This affects style / layout because it affects system font sizes.
@@ -5661,7 +5668,7 @@ bool nsWindow::IsToplevelWindowTransparent() {
   static bool transparencyConfigured = false;
 
   if (!transparencyConfigured) {
-    if (gdk_display_is_composited(gdk_display_get_default())) {
+    if (ScreenHelperGTK::IsComposited()) {
       // Some Gtk+ themes use non-rectangular toplevel windows. To fully
       // support such themes we need to make toplevel window transparent
       // with ARGB visual.
@@ -6203,8 +6210,8 @@ nsresult nsWindow::Create(nsIWidget* aParent, const LayoutDeviceIntRect& aRect,
   //                 nullptr);
   //g_signal_connect(mShell, "delete_event", G_CALLBACK(delete_event_cb),
   //                 nullptr);
-  //g_signal_connect(mShell, "window_state_event",
-  //                 G_CALLBACK(window_state_event_cb), nullptr);
+  g_signal_connect_after(mShell, "notify::state",
+                   G_CALLBACK(window_state_event_cb), nullptr);
   //g_signal_connect(mShell, "visibility-notify-event",
   //                 G_CALLBACK(visibility_notify_event_cb), nullptr);
   //g_signal_connect(mShell, "check-resize", G_CALLBACK(check_resize_cb),
@@ -6244,8 +6251,8 @@ nsresult nsWindow::Create(nsIWidget* aParent, const LayoutDeviceIntRect& aRect,
   hierarchy_changed_cb(GTK_WIDGET(mContainer), nullptr);
   // Expose, focus, key, and drag events are sent even to GTK_NO_WINDOW
   // widgets.
-  g_signal_connect(G_OBJECT(mContainer), "draw", G_CALLBACK(expose_event_cb),
-                   nullptr);
+  //g_signal_connect(G_OBJECT(mContainer), "draw", G_CALLBACK(expose_event_cb),
+  //                 nullptr);
   //GtkEventController* controller_focus = gtk_event_controller_focus_new();
   //gtk_widget_add_controller(GTK_WIDGET(mContainer), controller_focus);
   //g_signal_connect(mContainer, "enter", G_CALLBACK(focus_in_event_cb),
@@ -6346,14 +6353,14 @@ nsresult nsWindow::Create(nsIWidget* aParent, const LayoutDeviceIntRect& aRect,
 }
 
 void nsWindow::RefreshWindowClass(void) {
-  GdkWindow* gdkWindow = GetToplevelGdkWindow();
-  if (!gdkWindow) {
+  GdkSurface* gdkSurface = GetToplevelSurface();
+  if (!gdkSurface) {
     return;
   }
 
-  if (!mGtkWindowRoleName.IsEmpty()) {
-    gdk_window_set_role(gdkWindow, mGtkWindowRoleName.get());
-  }
+  //if (!mGtkWindowRoleName.IsEmpty()) {
+  //  gdk_window_set_role(gdkSurface, mGtkWindowRoleName.get());
+  //}
 
 #ifdef MOZ_X11
   if (GdkIsX11Display()) {
@@ -6388,12 +6395,12 @@ void nsWindow::RefreshWindowClass(void) {
 
 #ifdef MOZ_WAYLAND
   static auto sGdkWaylandWindowSetApplicationId =
-      (void (*)(GdkWindow*, const char*))dlsym(
+      (void (*)(GdkSurface*, const char*))dlsym(
           RTLD_DEFAULT, "gdk_wayland_window_set_application_id");
 
   if (GdkIsWaylandDisplay() && sGdkWaylandWindowSetApplicationId &&
       !mGtkWindowAppClass.IsEmpty()) {
-    sGdkWaylandWindowSetApplicationId(gdkWindow, mGtkWindowAppClass.get());
+    sGdkWaylandWindowSetApplicationId(gdkSurface, mGtkWindowAppClass.get());
   }
 #endif /* MOZ_WAYLAND */
 }
@@ -6459,7 +6466,7 @@ nsAutoCString nsWindow::GetDebugTag() const {
 }
 
 void nsWindow::NativeMoveResize(bool aMoved, bool aResized) {
-  GdkPoint topLeft = [&] {
+  GdkRectangle topLeft = [&] {
     auto target = mBounds.TopLeft();
     // gtk_window_move will undo the csd offset, but nothing else, so only add
     // the client offset if drawing to the csd titlebar.
@@ -6491,8 +6498,8 @@ void nsWindow::NativeMoveResize(bool aMoved, bool aResized) {
       NativeShow(false);
     }
     if (aMoved) {
-      LOG("  moving to %d x %d", topLeft.x, topLeft.y);
-      gtk_window_move(GTK_WINDOW(mShell), topLeft.x, topLeft.y);
+      //LOG("  moving to %d x %d", topLeft.x, topLeft.y);
+      //gtk_window_move(GTK_WINDOW(mShell), topLeft.x, topLeft.y);
     }
     return;
   }
@@ -6511,10 +6518,10 @@ void nsWindow::NativeMoveResize(bool aMoved, bool aResized) {
   } else {
     // x and y give the position of the window manager frame top-left.
     if (aMoved) {
-      gtk_window_move(GTK_WINDOW(mShell), topLeft.x, topLeft.y);
+      //gtk_window_move(GTK_WINDOW(mShell), topLeft.x, topLeft.y);
     }
     if (aResized) {
-      gtk_window_resize(GTK_WINDOW(mShell), size.width, size.height);
+      //gtk_window_resize(GTK_WINDOW(mShell), size.width, size.height);
       if (mIsDragPopup) {
         // DND window is placed inside container so we need to make hard size
         // request to ensure parent container is resized too.
@@ -6678,7 +6685,7 @@ void nsWindow::NativeShow(bool aAction) {
       }
     } else {
       LOG("  calling gtk_widget_show(mShell)\n");
-      gtk_widget_show(mShell);
+      gtk_widget_set_visible(mShell, TRUE);
     }
     if (GdkIsWaylandDisplay()) {
       SetUserTimeAndStartupTokenForActivatedWindow();
@@ -6690,8 +6697,8 @@ void nsWindow::NativeShow(bool aAction) {
 #endif
     }
     if (mHiddenPopupPositioned && IsPopup()) {
-      LOG("  re-position hidden popup window");
-      gtk_window_move(GTK_WINDOW(mShell), mPopupPosition.x, mPopupPosition.y);
+      //LOG("  re-position hidden popup window");
+      //gtk_window_move(GTK_WINDOW(mShell), mPopupPosition.x, mPopupPosition.y);
       mHiddenPopupPositioned = false;
     }
   } else {
@@ -6716,7 +6723,7 @@ void nsWindow::NativeShow(bool aAction) {
       // Workaround window freezes on GTK versions before 3.21.2 by
       // ensuring that configure events get dispatched to windows before
       // they are unmapped. See bug 1225044.
-      if (gtk_check_version(3, 21, 2) != nullptr && mPendingConfigures > 0) {
+      /* if (gtk_check_version(3, 21, 2) != nullptr && mPendingConfigures > 0) {
         GtkAllocation allocation;
         gtk_widget_get_allocation(GTK_WIDGET(mShell), &allocation);
 
@@ -6736,7 +6743,8 @@ void nsWindow::NativeShow(bool aAction) {
         }
         mPendingConfigures = 0;
       }
-      gtk_widget_hide(mShell);
+      */
+      gtk_widget_set_visible(mShell, FALSE);
     }
   }
 }
@@ -6823,8 +6831,8 @@ gint nsWindow::GetInputRegionMarginInGdkCoords() {
 void nsWindow::SetInputRegion(const InputRegion& aInputRegion) {
   mInputRegion = aInputRegion;
 
-  GdkWindow* window = GetToplevelGdkWindow();
-  if (!window) {
+  GdkSurface* surface = GetToplevelSurface();
+  if (!surface) {
     return;
   }
 
@@ -6849,13 +6857,13 @@ void nsWindow::SetInputRegion(const InputRegion& aInputRegion) {
     region = cairo_region_create_rectangle(&rect);
   }
 
-  gdk_window_input_shape_combine_region(window, region, 0, 0);
+  gdk_surface_set_input_region(surface, region);
 
   // On Wayland gdk_window_input_shape_combine_region() call is cached and
   // applied to underlying wl_surface when GdkWindow is repainted.
   // Force repaint of GdkWindow to apply the change immediately.
   if (GdkIsWaylandDisplay()) {
-    gdk_window_invalidate_rect(window, nullptr, false);
+    //gdk_window_invalidate_rect(surface, nullptr, false);
   }
 }
 
@@ -6905,11 +6913,11 @@ void nsWindow::UpdateOpaqueRegionInternal() {
     return;
   }
 
-  GdkWindow* window = GetToplevelGdkWindow();
-  if (!window) {
+  GdkSurface* surface = GetToplevelSurface();
+  if (!surface) {
     return;
   }
-  MOZ_ASSERT(gdk_window_get_window_type(window) == GDK_WINDOW_TOPLEVEL);
+  //MOZ_ASSERT(gdk_window_get_window_type(window) == GDK_WINDOW_TOPLEVEL);
 
   {
     AutoReadLock lock(mOpaqueRegionLock);
@@ -6921,20 +6929,20 @@ void nsWindow::UpdateOpaqueRegionInternal() {
       //
       // So we need to offset the rects by the position of mGdkWindow, in order
       // for them to be in the right coordinate system.
-      GdkPoint offset{0, 0};
-      gdk_window_get_position(mGdkWindow, &offset.x, &offset.y);
+      double x, y;
+      if (gdk_surface_translate_coordinates(mGdkWindow, surface, &x, &y)) {
+        region = cairo_region_create();
 
-      region = cairo_region_create();
-
-      for (auto iter = mOpaqueRegion.RectIter(); !iter.Done(); iter.Next()) {
-        auto gdkRect = DevicePixelsToGdkRectRoundIn(iter.Get());
-        cairo_rectangle_int_t rect = {gdkRect.x + offset.x,
-                                      gdkRect.y + offset.y, gdkRect.width,
+        for (auto iter = mOpaqueRegion.RectIter(); !iter.Done(); iter.Next()) {
+          auto gdkRect = DevicePixelsToGdkRectRoundIn(iter.Get());
+          cairo_rectangle_int_t rect = {gdkRect.x + static_cast<int>(x),
+                                      gdkRect.y + static_cast<int>(y), gdkRect.width,
                                       gdkRect.height};
-        cairo_region_union_rectangle(region, &rect);
+          cairo_region_union_rectangle(region, &rect);
+        }
       }
     }
-    gdk_window_set_opaque_region(window, region);
+    gdk_surface_set_opaque_region(surface, region);
     if (region) {
       cairo_region_destroy(region);
     }
@@ -6960,7 +6968,7 @@ bool nsWindow::DoDrawTilebarCorners() {
 GtkWidget* nsWindow::GetToplevelWidget() const { return mShell; }
 
 GdkSurface* nsWindow::GetToplevelSurface() const {
-  return gtk_native_get_surface(mShell);
+  return gtk_native_get_surface(GTK_NATIVE(mShell));
 }
 
 GdkSurface* nsWindow::GetSurfaceFromWidget(GtkWidget* aWidget) {
@@ -6983,12 +6991,12 @@ void nsWindow::SetUrgencyHint(GtkWidget* top_window, bool state) {
   if (!top_window) {
     return;
   }
-  GdkWindow* window = gtk_widget_get_window(top_window);
-  if (!window) {
+  GdkSurface* surface = GetSurfaceFromWidget(top_window);
+  if (!surface) {
     return;
   }
   // TODO: Use xdg-activation on Wayland?
-  gdk_window_set_urgency_hint(window, state);
+  //gdk_window_set_urgency_hint(window, state);
 }
 
 void nsWindow::SetDefaultIcon(void) { SetIcon(u"default"_ns); }
@@ -6999,7 +7007,7 @@ gint nsWindow::ConvertBorderStyles(BorderStyle aStyle) {
   if (aStyle == BorderStyle::Default) {
     return -1;
   }
-
+  /*
   // note that we don't handle BorderStyle::Close yet
   if (aStyle & BorderStyle::All) w |= GDK_DECOR_ALL;
   if (aStyle & BorderStyle::Border) w |= GDK_DECOR_BORDER;
@@ -7008,7 +7016,7 @@ gint nsWindow::ConvertBorderStyles(BorderStyle aStyle) {
   if (aStyle & BorderStyle::Menu) w |= GDK_DECOR_MENU;
   if (aStyle & BorderStyle::Minimize) w |= GDK_DECOR_MINIMIZE;
   if (aStyle & BorderStyle::Maximize) w |= GDK_DECOR_MAXIMIZE;
-
+  */
   return w;
 }
 
@@ -7027,36 +7035,34 @@ class FullscreenTransitionWindow final : public nsISupports {
 NS_IMPL_ISUPPORTS0(FullscreenTransitionWindow)
 
 FullscreenTransitionWindow::FullscreenTransitionWindow(GtkWidget* aWidget) {
-  mWindow = gtk_window_new(GTK_WINDOW_POPUP);
+  mWindow = gtk_window_new();
   GtkWindow* gtkWin = GTK_WINDOW(mWindow);
 
-  gtk_window_set_type_hint(gtkWin, GDK_WINDOW_TYPE_HINT_SPLASHSCREEN);
+  //gtk_window_set_type_hint(gtkWin, GDK_WINDOW_TYPE_HINT_SPLASHSCREEN);
   GtkWindowSetTransientFor(gtkWin, GTK_WINDOW(aWidget));
   gtk_window_set_decorated(gtkWin, false);
 
-  GdkWindow* gdkWin = gtk_widget_get_window(aWidget);
-  GdkScreen* screen = gtk_widget_get_screen(aWidget);
-  gint monitorNum = gdk_screen_get_monitor_at_window(screen, gdkWin);
-  GdkRectangle monitorRect;
-  gdk_screen_get_monitor_geometry(screen, monitorNum, &monitorRect);
-  gtk_window_set_screen(gtkWin, screen);
-  gtk_window_move(gtkWin, monitorRect.x, monitorRect.y);
-  MOZ_ASSERT(monitorRect.width > 0 && monitorRect.height > 0,
-             "Can't resize window smaller than 1x1.");
-  gtk_window_resize(gtkWin, monitorRect.width, monitorRect.height);
+  //GdkSurface* gdkWin = GetSurfaceFromWidget(aWidget);
+  GdkDisplay* display = gtk_widget_get_display(aWidget);
+  //GdkRectangle monitorRect;
+  gtk_window_set_display(gtkWin, display);
+  //gtk_window_move(gtkWin, monitorRect.x, monitorRect.y);
+  //MOZ_ASSERT(monitorRect.width > 0 && monitorRect.height > 0,
+  //           "Can't resize window smaller than 1x1.");
+  //gtk_window_resize(gtkWin, monitorRect.width, monitorRect.height);
 
-  GdkRGBA bgColor;
-  bgColor.red = bgColor.green = bgColor.blue = 0.0;
-  bgColor.alpha = 1.0;
-  gtk_widget_override_background_color(mWindow, GTK_STATE_FLAG_NORMAL,
-                                       &bgColor);
+  //GdkRGBA bgColor;
+  //bgColor.red = bgColor.green = bgColor.blue = 0.0;
+  //bgColor.alpha = 1.0;
+  //gtk_widget_override_background_color(mWindow, GTK_STATE_FLAG_NORMAL,
+  //                                     &bgColor);
 
   gtk_widget_set_opacity(mWindow, 0.0);
-  gtk_widget_show(mWindow);
+  gtk_widget_set_visible(mWindow, true);
 }
 
 FullscreenTransitionWindow::~FullscreenTransitionWindow() {
-  gtk_widget_destroy(mWindow);
+  gtk_window_destroy(GTK_WINDOW(mWindow));
 }
 
 class FullscreenTransitionData {
@@ -7166,7 +7172,7 @@ bool nsWindow::SynchronouslyRepaintOnResize() {
 void nsWindow::KioskLockOnMonitor() {
   // Available as of GTK 3.18+
   static auto sGdkWindowFullscreenOnMonitor =
-      (void (*)(GdkWindow* window, gint monitor))dlsym(
+      (void (*)(GdkSurface* window, gint monitor))dlsym(
           RTLD_DEFAULT, "gdk_window_fullscreen_on_monitor");
 
   if (!sGdkWindowFullscreenOnMonitor) {
@@ -7180,12 +7186,12 @@ void nsWindow::KioskLockOnMonitor() {
   }
 
   LOG("nsWindow::KioskLockOnMonitor() locked on %d\n", monitor);
-  sGdkWindowFullscreenOnMonitor(GetToplevelGdkWindow(), monitor);
+  sGdkWindowFullscreenOnMonitor(GetToplevelSurface(), monitor);
 }
 
 static bool IsFullscreenSupported(GtkWidget* aShell) {
 #ifdef MOZ_X11
-  GdkScreen* screen = gtk_widget_get_screen(aShell);
+  GdkDisplay* display = gtk_widget_get_display(aShell);
   GdkAtom atom = gdk_atom_intern("_NET_WM_STATE_FULLSCREEN", FALSE);
   return gdk_x11_screen_supports_net_wm_hint(screen, atom);
 #else
@@ -7206,7 +7212,7 @@ nsresult nsWindow::MakeFullScreen(bool aFullScreen) {
       mLastSizeModeBeforeFullscreen = mSizeMode;
     }
     if (mIsPIPWindow) {
-      gtk_window_set_type_hint(GTK_WINDOW(mShell), GDK_WINDOW_TYPE_HINT_NORMAL);
+      //gtk_window_set_type_hint(GTK_WINDOW(mShell), GDK_WINDOW_TYPE_HINT_NORMAL);
       if (gUseAspectRatio) {
         mAspectRatioSaved = mAspectRatio;
         mAspectRatio = 0.0f;
@@ -7242,21 +7248,21 @@ void nsWindow::SetWindowDecoration(BorderStyle aStyle) {
 
   // We can't use mGdkWindow directly here as it can be
   // derived from mContainer which is not a top-level GdkWindow.
-  GdkWindow* window = GetToplevelGdkWindow();
+  GdkSurface* window = GetToplevelSurface();
 
   // Sawfish, metacity, and presumably other window managers get
   // confused if we change the window decorations while the window
   // is visible.
   bool wasVisible = false;
-  if (gdk_window_is_visible(window)) {
-    gdk_window_hide(window);
+  if (gtk_widget_is_visible(GTK_WIDGET(mShell))) {
+    gtk_widget_set_visible(GTK_WIDGET(mShell), false);
     wasVisible = true;
   }
 
   gint wmd = ConvertBorderStyles(aStyle);
-  if (wmd != -1) gdk_window_set_decorations(window, (GdkWMDecoration)wmd);
+  //if (wmd != -1) gdk_window_set_decorations(window, (GdkWMDecoration)wmd);
 
-  if (wasVisible) gdk_window_show(window);
+  if (wasVisible) gtk_widget_set_visible(GTK_WIDGET(mShell), true);
 
   // For some window managers, adding or removing window decorations
   // requires unmapping and remapping our toplevel window.  Go ahead
@@ -7269,7 +7275,7 @@ void nsWindow::SetWindowDecoration(BorderStyle aStyle) {
   } else
 #endif /* MOZ_X11 */
   {
-    gdk_flush();
+    //gdk_flush();
   }
 }
 
@@ -7290,7 +7296,7 @@ bool nsWindow::CheckForRollup(gdouble aMouseX, gdouble aMouseY, bool aIsWheel,
   }
 
   auto* rollupWindow =
-      (GdkWindow*)rollupWidget->GetNativeData(NS_NATIVE_WINDOW);
+      (GdkSurface*)rollupWidget->GetNativeData(NS_NATIVE_WINDOW);
   if (!aAlwaysRollup && is_mouse_in_window(rollupWindow, aMouseX, aMouseY)) {
     return false;
   }
@@ -7313,7 +7319,7 @@ bool nsWindow::CheckForRollup(gdouble aMouseX, gdouble aMouseY, bool aIsWheel,
         rollupListener->GetSubmenuWidgetChain(&widgetChain);
     for (unsigned long i = 0; i < widgetChain.Length(); ++i) {
       nsIWidget* widget = widgetChain[i];
-      auto* currWindow = (GdkWindow*)widget->GetNativeData(NS_NATIVE_WINDOW);
+      auto* currWindow = (GdkSurface*)widget->GetNativeData(NS_NATIVE_WINDOW);
       if (is_mouse_in_window(currWindow, aMouseX, aMouseY)) {
         // Don't roll up if the mouse event occurred within a menu of the same
         // type.
@@ -7363,12 +7369,14 @@ bool nsWindow::DragInProgress() {
 // We try to detect when Wayland compositor / gtk fails to deliver
 // info about finished D&D operations and cancel it on our own.
 MOZ_CAN_RUN_SCRIPT static void WaylandDragWorkaround(nsWindow* aWindow,
-                                                     GdkEventButton* aEvent) {
+                                                     GdkButtonEvent* aGdkEvent) {
   static int buttonPressCountWithDrag = 0;
 
   // We track only left button state as Firefox performs D&D on left
   // button only.
-  if (aEvent->button != 1 || aEvent->type != GDK_BUTTON_PRESS) {
+  
+  if (gdk_button_event_get_button(GDK_EVENT(aGdkEvent)) != 1 ||
+    gdk_event_get_event_type(GDK_EVENT(aGdkEvent)) != GDK_BUTTON_PRESS) {
     return;
   }
 
@@ -7400,14 +7408,14 @@ static nsWindow* get_window_for_gtk_widget(GtkWidget* widget) {
   return static_cast<nsWindow*>(user_data);
 }
 
-static nsWindow* get_window_for_gdk_window(GdkWindow* window) {
+static nsWindow* get_window_for_gdk_window(GdkSurface* window) {
   gpointer user_data = g_object_get_data(G_OBJECT(window), "nsWindow");
   return static_cast<nsWindow*>(user_data);
 }
-
-static bool is_mouse_in_window(GdkWindow* aWindow, gdouble aMouseX,
+/*
+static bool is_mouse_in_window(GdkSurface* aWindow, gdouble aMouseX,
                                gdouble aMouseY) {
-  GdkWindow* window = aWindow;
+  GdkSurface* window = aWindow;
   if (!window) {
     return false;
   }
@@ -7460,7 +7468,7 @@ static GtkWidget* get_gtk_widget_for_gdk_window(GdkWindow* window) {
 
   return GTK_WIDGET(user_data);
 }
-
+*/
 static GdkCursor* get_gtk_cursor_from_type(uint8_t aCursorType) {
   GdkDisplay* defaultDisplay = gdk_display_get_default();
   GdkCursor* gdkcursor = nullptr;
@@ -7476,7 +7484,7 @@ static GdkCursor* get_gtk_cursor_from_type(uint8_t aCursorType) {
   // to themed cursors
   if (GtkCursors[aCursorType].hash) {
     gdkcursor =
-        gdk_cursor_new_from_name(defaultDisplay, GtkCursors[aCursorType].hash);
+        gdk_cursor_new_from_name(GtkCursors[aCursorType].hash, nullptr);
     if (gdkcursor) {
       return gdkcursor;
     }
@@ -7512,332 +7520,152 @@ static GdkCursor* get_gtk_cursor_from_type(uint8_t aCursorType) {
       *data++ = (((mask >> j) & 0x01) * 0xff);
     }
   }
-
-  gdkcursor = gdk_cursor_new_from_pixbuf(
-      gdk_display_get_default(), cursor_pixbuf, GtkCursors[aCursorType].hot_x,
-      GtkCursors[aCursorType].hot_y);
+  GdkTexture* texture = gdk_texture_new_for_pixbuf(cursor_pixbuf);
+  gdkcursor = gdk_cursor_new_from_texture(texture,
+       GtkCursors[aCursorType].hot_x, GtkCursors[aCursorType].hot_y, nullptr);
 
   g_object_unref(cursor_pixbuf);
-  return gdkcursor;
-}
-
-static GdkCursor* get_gtk_cursor_legacy(nsCursor aCursor) {
-  GdkCursor* gdkcursor = nullptr;
-  Maybe<uint8_t> fallbackType;
-
-  GdkDisplay* defaultDisplay = gdk_display_get_default();
-
-  // The strategy here is to use standard GDK cursors, and, if not available,
-  // load by standard name with gdk_cursor_new_from_name.
-  // Spec is here: http://www.freedesktop.org/wiki/Specifications/cursor-spec/
-  switch (aCursor) {
-    case eCursor_standard:
-      gdkcursor = gdk_cursor_new_for_display(defaultDisplay, GDK_LEFT_PTR);
-      break;
-    case eCursor_wait:
-      gdkcursor = gdk_cursor_new_for_display(defaultDisplay, GDK_WATCH);
-      break;
-    case eCursor_select:
-      gdkcursor = gdk_cursor_new_for_display(defaultDisplay, GDK_XTERM);
-      break;
-    case eCursor_hyperlink:
-      gdkcursor = gdk_cursor_new_for_display(defaultDisplay, GDK_HAND2);
-      break;
-    case eCursor_n_resize:
-      gdkcursor = gdk_cursor_new_for_display(defaultDisplay, GDK_TOP_SIDE);
-      break;
-    case eCursor_s_resize:
-      gdkcursor = gdk_cursor_new_for_display(defaultDisplay, GDK_BOTTOM_SIDE);
-      break;
-    case eCursor_w_resize:
-      gdkcursor = gdk_cursor_new_for_display(defaultDisplay, GDK_LEFT_SIDE);
-      break;
-    case eCursor_e_resize:
-      gdkcursor = gdk_cursor_new_for_display(defaultDisplay, GDK_RIGHT_SIDE);
-      break;
-    case eCursor_nw_resize:
-      gdkcursor =
-          gdk_cursor_new_for_display(defaultDisplay, GDK_TOP_LEFT_CORNER);
-      break;
-    case eCursor_se_resize:
-      gdkcursor =
-          gdk_cursor_new_for_display(defaultDisplay, GDK_BOTTOM_RIGHT_CORNER);
-      break;
-    case eCursor_ne_resize:
-      gdkcursor =
-          gdk_cursor_new_for_display(defaultDisplay, GDK_TOP_RIGHT_CORNER);
-      break;
-    case eCursor_sw_resize:
-      gdkcursor =
-          gdk_cursor_new_for_display(defaultDisplay, GDK_BOTTOM_LEFT_CORNER);
-      break;
-    case eCursor_crosshair:
-      gdkcursor = gdk_cursor_new_for_display(defaultDisplay, GDK_CROSSHAIR);
-      break;
-    case eCursor_move:
-      gdkcursor = gdk_cursor_new_for_display(defaultDisplay, GDK_FLEUR);
-      break;
-    case eCursor_help:
-      gdkcursor =
-          gdk_cursor_new_for_display(defaultDisplay, GDK_QUESTION_ARROW);
-      break;
-    case eCursor_copy:  // CSS3
-      gdkcursor = gdk_cursor_new_from_name(defaultDisplay, "copy");
-      if (!gdkcursor) fallbackType.emplace(MOZ_CURSOR_COPY);
-      break;
-    case eCursor_alias:
-      gdkcursor = gdk_cursor_new_from_name(defaultDisplay, "alias");
-      if (!gdkcursor) fallbackType.emplace(MOZ_CURSOR_ALIAS);
-      break;
-    case eCursor_context_menu:
-      gdkcursor = gdk_cursor_new_from_name(defaultDisplay, "context-menu");
-      if (!gdkcursor) fallbackType.emplace(MOZ_CURSOR_CONTEXT_MENU);
-      break;
-    case eCursor_cell:
-      gdkcursor = gdk_cursor_new_for_display(defaultDisplay, GDK_PLUS);
-      break;
-    // Those two aren’t standardized. Trying both KDE’s and GNOME’s names
-    case eCursor_grab:
-      gdkcursor = gdk_cursor_new_from_name(defaultDisplay, "openhand");
-      if (!gdkcursor) fallbackType.emplace(MOZ_CURSOR_HAND_GRAB);
-      break;
-    case eCursor_grabbing:
-      gdkcursor = gdk_cursor_new_from_name(defaultDisplay, "closedhand");
-      if (!gdkcursor) {
-        gdkcursor = gdk_cursor_new_from_name(defaultDisplay, "grabbing");
-      }
-      if (!gdkcursor) fallbackType.emplace(MOZ_CURSOR_HAND_GRABBING);
-      break;
-    case eCursor_spinning:
-      gdkcursor = gdk_cursor_new_from_name(defaultDisplay, "progress");
-      if (!gdkcursor) fallbackType.emplace(MOZ_CURSOR_SPINNING);
-      break;
-    case eCursor_zoom_in:
-      gdkcursor = gdk_cursor_new_from_name(defaultDisplay, "zoom-in");
-      if (!gdkcursor) fallbackType.emplace(MOZ_CURSOR_ZOOM_IN);
-      break;
-    case eCursor_zoom_out:
-      gdkcursor = gdk_cursor_new_from_name(defaultDisplay, "zoom-out");
-      if (!gdkcursor) fallbackType.emplace(MOZ_CURSOR_ZOOM_OUT);
-      break;
-    case eCursor_not_allowed:
-      gdkcursor = gdk_cursor_new_from_name(defaultDisplay, "not-allowed");
-      if (!gdkcursor) {  // nonstandard, yet common
-        gdkcursor = gdk_cursor_new_from_name(defaultDisplay, "crossed_circle");
-      }
-      if (!gdkcursor) fallbackType.emplace(MOZ_CURSOR_NOT_ALLOWED);
-      break;
-    case eCursor_no_drop:
-      gdkcursor = gdk_cursor_new_from_name(defaultDisplay, "no-drop");
-      if (!gdkcursor) {  // this nonstandard sequence makes it work on KDE and
-                         // GNOME
-        gdkcursor = gdk_cursor_new_from_name(defaultDisplay, "forbidden");
-      }
-      if (!gdkcursor) {
-        gdkcursor = gdk_cursor_new_from_name(defaultDisplay, "circle");
-      }
-      if (!gdkcursor) fallbackType.emplace(MOZ_CURSOR_NOT_ALLOWED);
-      break;
-    case eCursor_vertical_text:
-      gdkcursor = gdk_cursor_new_from_name(defaultDisplay, "vertical-text");
-      if (!gdkcursor) {
-        fallbackType.emplace(MOZ_CURSOR_VERTICAL_TEXT);
-      }
-      break;
-    case eCursor_all_scroll:
-      gdkcursor = gdk_cursor_new_from_name(defaultDisplay, "all-scroll");
-      break;
-    case eCursor_nesw_resize:
-      gdkcursor = gdk_cursor_new_from_name(defaultDisplay, "size_bdiag");
-      if (!gdkcursor) fallbackType.emplace(MOZ_CURSOR_NESW_RESIZE);
-      break;
-    case eCursor_nwse_resize:
-      gdkcursor = gdk_cursor_new_from_name(defaultDisplay, "size_fdiag");
-      if (!gdkcursor) fallbackType.emplace(MOZ_CURSOR_NWSE_RESIZE);
-      break;
-    case eCursor_ns_resize:
-      gdkcursor =
-          gdk_cursor_new_for_display(defaultDisplay, GDK_SB_V_DOUBLE_ARROW);
-      break;
-    case eCursor_ew_resize:
-      gdkcursor =
-          gdk_cursor_new_for_display(defaultDisplay, GDK_SB_H_DOUBLE_ARROW);
-      break;
-    // Here, two better fitting cursors exist in some cursor themes. Try those
-    // first
-    case eCursor_row_resize:
-      gdkcursor = gdk_cursor_new_from_name(defaultDisplay, "split_v");
-      if (!gdkcursor) {
-        gdkcursor =
-            gdk_cursor_new_for_display(defaultDisplay, GDK_SB_V_DOUBLE_ARROW);
-      }
-      break;
-    case eCursor_col_resize:
-      gdkcursor = gdk_cursor_new_from_name(defaultDisplay, "split_h");
-      if (!gdkcursor) {
-        gdkcursor =
-            gdk_cursor_new_for_display(defaultDisplay, GDK_SB_H_DOUBLE_ARROW);
-      }
-      break;
-    case eCursor_none:
-      fallbackType.emplace(MOZ_CURSOR_NONE);
-      break;
-    default:
-      NS_ASSERTION(aCursor, "Invalid cursor type");
-      gdkcursor = gdk_cursor_new_for_display(defaultDisplay, GDK_LEFT_PTR);
-      break;
-  }
-
-  if (!gdkcursor && fallbackType.isSome()) {
-    LOGW("get_gtk_cursor_legacy(): Failed to get cursor %d, try fallback",
-         aCursor);
-    gdkcursor = get_gtk_cursor_from_type(*fallbackType);
-  }
-
+  g_object_unref(texture);
   return gdkcursor;
 }
 
 static GdkCursor* get_gtk_cursor_from_name(nsCursor aCursor) {
   GdkCursor* gdkcursor = nullptr;
   Maybe<uint8_t> fallbackType;
-
-  GdkDisplay* defaultDisplay = gdk_display_get_default();
-
   switch (aCursor) {
     case eCursor_standard:
-      gdkcursor = gdk_cursor_new_from_name(defaultDisplay, "default");
+      gdkcursor = gdk_cursor_new_from_name("default", nullptr);
       break;
     case eCursor_wait:
-      gdkcursor = gdk_cursor_new_from_name(defaultDisplay, "wait");
+      gdkcursor = gdk_cursor_new_from_name("wait", nullptr);
       break;
     case eCursor_select:
-      gdkcursor = gdk_cursor_new_from_name(defaultDisplay, "text");
+      gdkcursor = gdk_cursor_new_from_name("text", nullptr);
       break;
     case eCursor_hyperlink:
-      gdkcursor = gdk_cursor_new_from_name(defaultDisplay, "pointer");
+      gdkcursor = gdk_cursor_new_from_name("pointer", nullptr);
       break;
     case eCursor_n_resize:
-      gdkcursor = gdk_cursor_new_from_name(defaultDisplay, "n-resize");
+      gdkcursor = gdk_cursor_new_from_name("n-resize", nullptr);
       break;
     case eCursor_s_resize:
-      gdkcursor = gdk_cursor_new_from_name(defaultDisplay, "s-resize");
+      gdkcursor = gdk_cursor_new_from_name("s-resize", nullptr);
       break;
     case eCursor_w_resize:
-      gdkcursor = gdk_cursor_new_from_name(defaultDisplay, "w-resize");
+      gdkcursor = gdk_cursor_new_from_name("w-resize", nullptr);
       break;
     case eCursor_e_resize:
-      gdkcursor = gdk_cursor_new_from_name(defaultDisplay, "e-resize");
+      gdkcursor = gdk_cursor_new_from_name("e-resize", nullptr);
       break;
     case eCursor_nw_resize:
-      gdkcursor = gdk_cursor_new_from_name(defaultDisplay, "nw-resize");
+      gdkcursor = gdk_cursor_new_from_name("nw-resize", nullptr);
       break;
     case eCursor_se_resize:
-      gdkcursor = gdk_cursor_new_from_name(defaultDisplay, "se-resize");
+      gdkcursor = gdk_cursor_new_from_name("se-resize", nullptr);
       break;
     case eCursor_ne_resize:
-      gdkcursor = gdk_cursor_new_from_name(defaultDisplay, "ne-resize");
+      gdkcursor = gdk_cursor_new_from_name("ne-resize", nullptr);
       break;
     case eCursor_sw_resize:
-      gdkcursor = gdk_cursor_new_from_name(defaultDisplay, "sw-resize");
+      gdkcursor = gdk_cursor_new_from_name("sw-resize", nullptr);
       break;
     case eCursor_crosshair:
-      gdkcursor = gdk_cursor_new_from_name(defaultDisplay, "crosshair");
+      gdkcursor = gdk_cursor_new_from_name("crosshair", nullptr);
       break;
     case eCursor_move:
-      gdkcursor = gdk_cursor_new_from_name(defaultDisplay, "move");
+      gdkcursor = gdk_cursor_new_from_name("move", nullptr);
       break;
     case eCursor_help:
-      gdkcursor = gdk_cursor_new_from_name(defaultDisplay, "help");
+      gdkcursor = gdk_cursor_new_from_name("help", nullptr);
       break;
     case eCursor_copy:
-      gdkcursor = gdk_cursor_new_from_name(defaultDisplay, "copy");
+      gdkcursor = gdk_cursor_new_from_name("copy", nullptr);
       if (!gdkcursor) fallbackType.emplace(MOZ_CURSOR_COPY);
       break;
     case eCursor_alias:
-      gdkcursor = gdk_cursor_new_from_name(defaultDisplay, "alias");
+      gdkcursor = gdk_cursor_new_from_name("alias", nullptr);
       if (!gdkcursor) fallbackType.emplace(MOZ_CURSOR_ALIAS);
       break;
     case eCursor_context_menu:
-      gdkcursor = gdk_cursor_new_from_name(defaultDisplay, "context-menu");
+      gdkcursor = gdk_cursor_new_from_name("context-menu", nullptr);
       if (!gdkcursor) fallbackType.emplace(MOZ_CURSOR_CONTEXT_MENU);
       break;
     case eCursor_cell:
-      gdkcursor = gdk_cursor_new_from_name(defaultDisplay, "cell");
+      gdkcursor = gdk_cursor_new_from_name("cell", nullptr);
       break;
     case eCursor_grab:
-      gdkcursor = gdk_cursor_new_from_name(defaultDisplay, "grab");
+      gdkcursor = gdk_cursor_new_from_name("grab", nullptr);
       if (!gdkcursor) fallbackType.emplace(MOZ_CURSOR_HAND_GRAB);
       break;
     case eCursor_grabbing:
-      gdkcursor = gdk_cursor_new_from_name(defaultDisplay, "grabbing");
+      gdkcursor = gdk_cursor_new_from_name("grabbing", nullptr);
       if (!gdkcursor) fallbackType.emplace(MOZ_CURSOR_HAND_GRABBING);
       break;
     case eCursor_spinning:
-      gdkcursor = gdk_cursor_new_from_name(defaultDisplay, "progress");
+      gdkcursor = gdk_cursor_new_from_name("progress", nullptr);
       if (!gdkcursor) fallbackType.emplace(MOZ_CURSOR_SPINNING);
       break;
     case eCursor_zoom_in:
-      gdkcursor = gdk_cursor_new_from_name(defaultDisplay, "zoom-in");
+      gdkcursor = gdk_cursor_new_from_name("zoom-in", nullptr);
       if (!gdkcursor) fallbackType.emplace(MOZ_CURSOR_ZOOM_IN);
       break;
     case eCursor_zoom_out:
-      gdkcursor = gdk_cursor_new_from_name(defaultDisplay, "zoom-out");
+      gdkcursor = gdk_cursor_new_from_name("zoom-out", nullptr);
       if (!gdkcursor) fallbackType.emplace(MOZ_CURSOR_ZOOM_OUT);
       break;
     case eCursor_not_allowed:
-      gdkcursor = gdk_cursor_new_from_name(defaultDisplay, "not-allowed");
+      gdkcursor = gdk_cursor_new_from_name("not-allowed", nullptr);
       if (!gdkcursor) fallbackType.emplace(MOZ_CURSOR_NOT_ALLOWED);
       break;
     case eCursor_no_drop:
-      gdkcursor = gdk_cursor_new_from_name(defaultDisplay, "no-drop");
+      gdkcursor = gdk_cursor_new_from_name("no-drop", nullptr);
       if (!gdkcursor) {  // this nonstandard sequence makes it work on KDE and
                          // GNOME
-        gdkcursor = gdk_cursor_new_from_name(defaultDisplay, "forbidden");
+        gdkcursor = gdk_cursor_new_from_name("forbidden", nullptr);
       }
       if (!gdkcursor) {
-        gdkcursor = gdk_cursor_new_from_name(defaultDisplay, "circle");
+        gdkcursor = gdk_cursor_new_from_name("circle", nullptr);
       }
       if (!gdkcursor) fallbackType.emplace(MOZ_CURSOR_NOT_ALLOWED);
       break;
     case eCursor_vertical_text:
-      gdkcursor = gdk_cursor_new_from_name(defaultDisplay, "vertical-text");
+      gdkcursor = gdk_cursor_new_from_name("vertical-text", nullptr);
       if (!gdkcursor) {
         fallbackType.emplace(MOZ_CURSOR_VERTICAL_TEXT);
       }
       break;
     case eCursor_all_scroll:
-      gdkcursor = gdk_cursor_new_from_name(defaultDisplay, "all-scroll");
+      gdkcursor = gdk_cursor_new_from_name("all-scroll", nullptr);
       break;
     case eCursor_nesw_resize:
-      gdkcursor = gdk_cursor_new_from_name(defaultDisplay, "nesw-resize");
+      gdkcursor = gdk_cursor_new_from_name("nesw-resize", nullptr);
       if (!gdkcursor) fallbackType.emplace(MOZ_CURSOR_NESW_RESIZE);
       break;
     case eCursor_nwse_resize:
-      gdkcursor = gdk_cursor_new_from_name(defaultDisplay, "nwse-resize");
+      gdkcursor = gdk_cursor_new_from_name("nwse-resize", nullptr);
       if (!gdkcursor) fallbackType.emplace(MOZ_CURSOR_NWSE_RESIZE);
       break;
     case eCursor_ns_resize:
-      gdkcursor = gdk_cursor_new_from_name(defaultDisplay, "ns-resize");
+      gdkcursor = gdk_cursor_new_from_name("ns-resize", nullptr);
       break;
     case eCursor_ew_resize:
-      gdkcursor = gdk_cursor_new_from_name(defaultDisplay, "ew-resize");
+      gdkcursor = gdk_cursor_new_from_name("ew-resize", nullptr);
       break;
     case eCursor_row_resize:
-      gdkcursor = gdk_cursor_new_from_name(defaultDisplay, "row-resize");
+      gdkcursor = gdk_cursor_new_from_name("row-resize", nullptr);
       break;
     case eCursor_col_resize:
-      gdkcursor = gdk_cursor_new_from_name(defaultDisplay, "col-resize");
+      gdkcursor = gdk_cursor_new_from_name("col-resize", nullptr);
       break;
     case eCursor_none:
-      gdkcursor = gdk_cursor_new_from_name(defaultDisplay, "none");
+      gdkcursor = gdk_cursor_new_from_name("none", nullptr);
       if (!gdkcursor) fallbackType.emplace(MOZ_CURSOR_NONE);
       break;
     default:
       NS_ASSERTION(aCursor, "Invalid cursor type");
-      gdkcursor = gdk_cursor_new_from_name(defaultDisplay, "default");
+      gdkcursor = gdk_cursor_new_from_name("default", nullptr);
       break;
   }
-
   if (!gdkcursor && fallbackType.isSome()) {
     LOGW("get_gtk_cursor_from_name(): Failed to get cursor %d, try fallback",
          aCursor);
@@ -7845,6 +7673,10 @@ static GdkCursor* get_gtk_cursor_from_name(nsCursor aCursor) {
   }
 
   return gdkcursor;
+}
+
+static GdkCursor* get_gtk_cursor_legacy(nsCursor aCursor) {
+  return get_gtk_cursor_from_name(aCursor);
 }
 
 static GdkCursor* get_gtk_cursor(nsCursor aCursor) {
@@ -7864,8 +7696,8 @@ static GdkCursor* get_gtk_cursor(nsCursor aCursor) {
 }
 
 // gtk callbacks
-
-void draw_window_of_widget(GtkWidget* widget, GdkWindow* aWindow, cairo_t* cr) {
+/*
+void draw_window_of_widget(GtkWidget* widget, GdkSurface* aWindow, cairo_t* cr) {
   if (gtk_cairo_should_draw_window(cr, aWindow)) {
     RefPtr<nsWindow> window = get_window_for_gtk_widget(widget);
     if (!window) {
@@ -7880,8 +7712,9 @@ void draw_window_of_widget(GtkWidget* widget, GdkWindow* aWindow, cairo_t* cr) {
     }
   }
 }
-
+*/
 /* static */
+/*
 gboolean expose_event_cb(GtkWidget* widget, cairo_t* cr) {
   draw_window_of_widget(widget, gtk_widget_get_window(widget), cr);
 
@@ -7898,7 +7731,8 @@ gboolean expose_event_cb(GtkWidget* widget, cairo_t* cr) {
 
   return FALSE;
 }
-
+*/
+/*
 static gboolean configure_event_cb(GtkWidget* widget,
                                    GdkEventConfigure* event) {
   RefPtr<nsWindow> window = get_window_for_gtk_widget(widget);
@@ -7940,21 +7774,26 @@ static gboolean delete_event_cb(GtkWidget* widget, GdkEventAny* event) {
 
   return TRUE;
 }
-
-static gboolean enter_notify_event_cb(GtkWidget* widget,
-                                      GdkEventCrossing* event) {
-  RefPtr<nsWindow> window = get_window_for_gdk_window(event->window);
-  if (!window) {
+*/
+static gboolean enter_notify_event_cb(GtkEventControllerMotion* controller,
+                                      gdouble pos_x, gdouble pos_y) {
+  GdkEvent* event = gtk_event_controller_get_current_event(GTK_EVENT_CONTROLLER(controller));
+  if (!event) {
     return TRUE;
   }
-
+  GtkWidget* widget = gtk_event_controller_get_widget(GTK_EVENT_CONTROLLER(controller));
+  RefPtr<nsWindow> window = get_window_for_gtk_widget(widget);
+  if (!window) {
+    return FALSE;
+  }
+  /*
   // We have stored leave notify - check if it's the correct one and
   // fire it before enter notify in such case.
   if (sStoredLeaveNotifyEvent) {
     auto clearNofityEvent =
         MakeScopeExit([&] { sStoredLeaveNotifyEvent = nullptr; });
-    if (event->x_root == sStoredLeaveNotifyEvent->x_root &&
-        event->y_root == sStoredLeaveNotifyEvent->y_root &&
+    if (pos_x == sStoredLeaveNotifyEvent->x_root &&
+        pos_y == sStoredLeaveNotifyEvent->y_root &&
         window->ApplyEnterLeaveMutterWorkaround()) {
       // Enter/Leave notify events has the same coordinates
       // and uses know buggy window config.
@@ -7967,18 +7806,23 @@ static gboolean enter_notify_event_cb(GtkWidget* widget,
       leftWindow->OnLeaveNotifyEvent(sStoredLeaveNotifyEvent.get());
     }
   }
-
+  */
   window->OnEnterNotifyEvent(event);
   return TRUE;
 }
 
-static gboolean leave_notify_event_cb(GtkWidget* widget,
-                                      GdkEventCrossing* event) {
-  RefPtr<nsWindow> window = get_window_for_gdk_window(event->window);
-  if (!window) {
+static gboolean leave_notify_event_cb(GtkEventControllerMotion* controller,
+                                      gdouble pos_x, gdouble pos_y) {
+  GdkEvent* event = gtk_event_controller_get_current_event(GTK_EVENT_CONTROLLER(controller));
+  if (!event) {
     return TRUE;
   }
-
+  GtkWidget* widget = gtk_event_controller_get_widget(GTK_EVENT_CONTROLLER(controller));
+  RefPtr<nsWindow> window = get_window_for_gtk_widget(widget);
+  if (!window) {
+    return FALSE;
+  }
+  /*
   if (window->ApplyEnterLeaveMutterWorkaround()) {
     // The leave event is potentially wrong, don't fire it now but store
     // it for further check at enter_notify_event_cb().
@@ -7988,65 +7832,81 @@ static gboolean leave_notify_event_cb(GtkWidget* widget,
     sStoredLeaveNotifyEvent = nullptr;
     window->OnLeaveNotifyEvent(event);
   }
-
+  */
+  window->OnEnterNotifyEvent(event);
   return TRUE;
 }
 
-static gboolean motion_notify_event_cb(GtkWidget* widget,
-                                       GdkEventMotion* event) {
-  UpdateLastInputEventTime(event);
-
-  RefPtr<nsWindow> window = get_window_for_gdk_window(event->window);
+static gboolean motion_notify_event_cb(GtkEventControllerMotion* controller,
+                                       gdouble pos_x, gdouble pos_y) {
+  GdkEvent* event = gtk_event_controller_get_current_event(GTK_EVENT_CONTROLLER(controller));
+  if (!event) {
+    return TRUE;
+  }
+  GtkWidget* widget = gtk_event_controller_get_widget(GTK_EVENT_CONTROLLER(controller));
+  RefPtr<nsWindow> window = get_window_for_gtk_widget(widget);
   if (!window) {
     return FALSE;
   }
+  UpdateLastInputEventTime(event);
 
   window->OnMotionNotifyEvent(event);
 
   return TRUE;
 }
 
-static gboolean button_press_event_cb(GtkWidget* widget,
-                                      GdkEventButton* event) {
-  UpdateLastInputEventTime(event);
-
-  if (event->button == 2 && !StaticPrefs::widget_gtk_middle_click_enabled()) {
+static gboolean button_press_event_cb(GtkGestureClick* gesture, gint n_press,
+                                      gdouble pos_x, gdouble pos_y) {
+  GdkEvent* event = gtk_event_controller_get_current_event(GTK_EVENT_CONTROLLER(gesture));
+  if (!event) {
+    return TRUE;
+  }
+  if (gdk_button_event_get_button(GDK_EVENT(event)) == 2 && !StaticPrefs::widget_gtk_middle_click_enabled()) {
     return FALSE;
   }
-
-  RefPtr<nsWindow> window = get_window_for_gdk_window(event->window);
+  
+  GtkWidget* widget = gtk_event_controller_get_widget(GTK_EVENT_CONTROLLER(gesture));
+  RefPtr<nsWindow> window = get_window_for_gtk_widget(widget);
   if (!window) {
     return FALSE;
   }
-
+  UpdateLastInputEventTime(event);
   window->OnButtonPressEvent(event);
 
-  if (GdkIsWaylandDisplay()) {
-    WaylandDragWorkaround(window, event);
-  }
+  //if (GdkIsWaylandDisplay()) {
+  //  WaylandDragWorkaround(window, event);
+  //}
 
   return TRUE;
 }
 
-static gboolean button_release_event_cb(GtkWidget* widget,
-                                        GdkEventButton* event) {
-  UpdateLastInputEventTime(event);
-
-  if (event->button == 2 && !StaticPrefs::widget_gtk_middle_click_enabled()) {
+static gboolean button_release_event_cb(GtkGestureClick* gesture, gint n_press,
+                                        gdouble pos_x, gdouble pos_y) {
+  GdkEvent* event = gtk_event_controller_get_current_event(GTK_EVENT_CONTROLLER(gesture));
+  if (!event) {
+    return TRUE;
+  }
+  if (gdk_button_event_get_button(GDK_EVENT(event)) == 2 && !StaticPrefs::widget_gtk_middle_click_enabled()) {
     return FALSE;
   }
 
-  RefPtr<nsWindow> window = get_window_for_gdk_window(event->window);
+  GtkWidget* widget = gtk_event_controller_get_widget(GTK_EVENT_CONTROLLER(gesture));
+  RefPtr<nsWindow> window = get_window_for_gtk_widget(widget);
   if (!window) {
     return FALSE;
   }
-
+  UpdateLastInputEventTime(event);
   window->OnButtonReleaseEvent(event);
 
   return TRUE;
 }
 
-static gboolean focus_in_event_cb(GtkWidget* widget, GdkEventFocus* event) {
+static gboolean focus_in_event_cb(GtkEventControllerFocus* controller) {
+  GdkEvent* event = gtk_event_controller_get_current_event(GTK_EVENT_CONTROLLER(controller));
+  if (!event) {
+    return TRUE;
+  }
+  GtkWidget* widget = gtk_event_controller_get_widget(GTK_EVENT_CONTROLLER(controller));
   RefPtr<nsWindow> window = get_window_for_gtk_widget(widget);
   if (!window) {
     return FALSE;
@@ -8057,7 +7917,13 @@ static gboolean focus_in_event_cb(GtkWidget* widget, GdkEventFocus* event) {
   return FALSE;
 }
 
-static gboolean focus_out_event_cb(GtkWidget* widget, GdkEventFocus* event) {
+static gboolean focus_out_event_cb(GtkEventControllerFocus* controller) {
+  GdkEvent* event = gtk_event_controller_get_current_event(GTK_EVENT_CONTROLLER(controller));
+  if (!event) {
+    return TRUE;
+  }
+  GtkWidget* widget = gtk_event_controller_get_widget(GTK_EVENT_CONTROLLER(controller));
+  
   RefPtr<nsWindow> window = get_window_for_gtk_widget(widget);
   if (!window) {
     return FALSE;
@@ -8136,17 +8002,21 @@ static GdkFilterReturn popup_take_focus_filter(GdkXEvent* gdk_xevent,
 }
 #endif /* MOZ_X11 */
 
-static gboolean key_press_event_cb(GtkWidget* widget, GdkEventKey* event) {
+static gboolean key_press_event_cb(GtkEventControllerKey* controller,
+                                   guint keyval, guint keycode,
+                                   GdkModifierType state) {
   LOGW("key_press_event_cb\n");
-
-  UpdateLastInputEventTime(event);
-
+  GdkEvent* event = gtk_event_controller_get_current_event(GTK_EVENT_CONTROLLER(controller));
+  if (!event) {
+    return TRUE;
+  }
+  GtkWidget* widget = gtk_event_controller_get_widget(GTK_EVENT_CONTROLLER(controller));
   // find the window with focus and dispatch this event to that widget
   nsWindow* window = get_window_for_gtk_widget(widget);
   if (!window) {
     return FALSE;
   }
-
+  
   RefPtr<nsWindow> focusWindow = gFocusWindow ? gFocusWindow : window;
 
 #ifdef MOZ_X11
@@ -8179,15 +8049,19 @@ static gboolean key_press_event_cb(GtkWidget* widget, GdkEventKey* event) {
     }
   }
 #endif
-
+  UpdateLastInputEventTime(event);
   return focusWindow->OnKeyPressEvent(event);
 }
 
-static gboolean key_release_event_cb(GtkWidget* widget, GdkEventKey* event) {
+static gboolean key_release_event_cb(GtkEventControllerKey* controller,
+                                   guint keyval, guint keycode,
+                                   GdkModifierType state) {
   LOGW("key_release_event_cb\n");
-
-  UpdateLastInputEventTime(event);
-
+  GdkEvent* event = gtk_event_controller_get_current_event(GTK_EVENT_CONTROLLER(controller));
+  if (!event) {
+    return TRUE;
+  }
+  GtkWidget* widget = gtk_event_controller_get_widget(GTK_EVENT_CONTROLLER(controller));
   // find the window with focus and dispatch this event to that widget
   nsWindow* window = get_window_for_gtk_widget(widget);
   if (!window) {
@@ -8195,9 +8069,11 @@ static gboolean key_release_event_cb(GtkWidget* widget, GdkEventKey* event) {
   }
 
   RefPtr<nsWindow> focusWindow = gFocusWindow ? gFocusWindow : window;
+  
+  UpdateLastInputEventTime(event);
   return focusWindow->OnKeyReleaseEvent(event);
 }
-
+/*
 static gboolean property_notify_event_cb(GtkWidget* aWidget,
                                          GdkEventProperty* aEvent) {
   RefPtr<nsWindow> window = get_window_for_gdk_window(aEvent->window);
@@ -8207,9 +8083,16 @@ static gboolean property_notify_event_cb(GtkWidget* aWidget,
 
   return window->OnPropertyNotifyEvent(aWidget, aEvent);
 }
-
-static gboolean scroll_event_cb(GtkWidget* widget, GdkEventScroll* event) {
-  RefPtr<nsWindow> window = get_window_for_gdk_window(event->window);
+*/
+static gboolean scroll_event_cb(GtkEventControllerScroll* controller,
+                                gdouble dx, gdouble dy) {
+  GdkEvent* event = gtk_event_controller_get_current_event(GTK_EVENT_CONTROLLER(controller));
+  if (!event) {
+    return TRUE;
+  }
+  GtkWidget* widget = gtk_event_controller_get_widget(GTK_EVENT_CONTROLLER(controller));
+  
+  RefPtr<nsWindow> window = get_window_for_gtk_widget(widget);
   if (NS_WARN_IF(!window)) {
     return FALSE;
   }
@@ -8218,7 +8101,7 @@ static gboolean scroll_event_cb(GtkWidget* widget, GdkEventScroll* event) {
 
   return TRUE;
 }
-
+/*
 static gboolean visibility_notify_event_cb(GtkWidget* widget,
                                            GdkEventVisibility* event) {
   RefPtr<nsWindow> window = get_window_for_gdk_window(event->window);
@@ -8228,54 +8111,56 @@ static gboolean visibility_notify_event_cb(GtkWidget* widget,
   window->OnVisibilityNotifyEvent(event->state);
   return TRUE;
 }
-
-static void hierarchy_changed_cb(GtkWidget* widget,
-                                 GtkWidget* previous_toplevel) {
-  GtkWidget* toplevel = gtk_widget_get_toplevel(widget);
-  GdkWindowState old_window_state = GDK_WINDOW_STATE_WITHDRAWN;
-  GdkEventWindowState event;
-
-  event.new_window_state = GDK_WINDOW_STATE_WITHDRAWN;
-
-  if (GTK_IS_WINDOW(previous_toplevel)) {
-    g_signal_handlers_disconnect_by_func(
-        previous_toplevel, FuncToGpointer(window_state_event_cb), widget);
-    GdkWindow* win = gtk_widget_get_window(previous_toplevel);
-    if (win) {
-      old_window_state = gdk_window_get_state(win);
-    }
-  }
-
-  if (GTK_IS_WINDOW(toplevel)) {
-    g_signal_connect_swapped(toplevel, "window-state-event",
-                             G_CALLBACK(window_state_event_cb), widget);
-    GdkWindow* win = gtk_widget_get_window(toplevel);
-    if (win) {
-      event.new_window_state = gdk_window_get_state(win);
-    }
-  }
-
-  event.changed_mask =
-      static_cast<GdkWindowState>(old_window_state ^ event.new_window_state);
-
-  if (event.changed_mask) {
-    event.type = GDK_WINDOW_STATE;
-    event.window = nullptr;
-    event.send_event = TRUE;
-    window_state_event_cb(widget, &event);
-  }
-}
+*/
 
 static gboolean window_state_event_cb(GtkWidget* widget,
-                                      GdkEventWindowState* event) {
+                                      GParamSpec* pspec) {
   RefPtr<nsWindow> window = get_window_for_gtk_widget(widget);
   if (!window) {
     return FALSE;
   }
 
-  window->OnWindowStateEvent(widget, event);
-
+  GtkWidget* toplevel = GTK_WIDGET(gtk_widget_get_native(widget));
+  if (GTK_IS_WINDOW(toplevel)) {
+    GdkSurface* surface = gtk_native_get_surface(GTK_NATIVE(toplevel));
+    if (surface) {
+      GdkToplevelState state = gdk_toplevel_get_state(GDK_TOPLEVEL(surface));
+      window->OnWindowStateEvent(widget, state);
+    }
+  }
   return FALSE;
+}
+
+static void hierarchy_changed_cb(GtkWidget* widget,
+                                 GtkWidget* previous_toplevel) {
+  GtkWidget* toplevel = GTK_WIDGET(gtk_widget_get_native(widget));
+  GdkToplevelState old_window_state = GDK_TOPLEVEL_STATE_SUSPENDED;
+  GdkToplevelState new_window_state = GDK_TOPLEVEL_STATE_SUSPENDED;
+
+  if (GTK_IS_WINDOW(previous_toplevel)) {
+    g_signal_handlers_disconnect_by_func(
+        previous_toplevel, FuncToGpointer(window_state_event_cb), widget);
+    GdkSurface* surface = gtk_native_get_surface(GTK_NATIVE(previous_toplevel));
+    if (surface) {
+      old_window_state = gdk_toplevel_get_state(GDK_TOPLEVEL(surface));
+    }
+  }
+
+  if (GTK_IS_WINDOW(toplevel)) {
+    g_signal_connect_swapped(toplevel, "notify::state",
+                             G_CALLBACK(window_state_event_cb), widget);
+    GdkSurface* surface = gtk_native_get_surface(GTK_NATIVE(toplevel));
+    if (surface) {
+      new_window_state = gdk_toplevel_get_state(GDK_TOPLEVEL(surface));
+    }
+  }
+
+  RefPtr<nsWindow> window = get_window_for_gtk_widget(widget);
+  if (!window) {
+    return;
+  }
+  window->OnWindowStateEvent(widget, new_window_state);
+  
 }
 
 static void settings_xft_dpi_changed_cb(GtkSettings* gtk_settings,
