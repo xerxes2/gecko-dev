@@ -43,17 +43,17 @@ class KeymapWrapper {
   /**
    * Compute an our DOM keycode from a GDK keyval.
    */
-  static uint32_t ComputeDOMKeyCode(GdkKeyEvent* aGdkKeyEvent);
+  static uint32_t ComputeDOMKeyCode(GdkEvent* aGdkKeyEvent);
 
   /**
    * Compute a DOM key name index from aGdkKeyEvent.
    */
-  static KeyNameIndex ComputeDOMKeyNameIndex(GdkKeyEvent* aGdkKeyEvent);
+  static KeyNameIndex ComputeDOMKeyNameIndex(GdkEvent* aGdkKeyEvent);
 
   /**
    * Compute a DOM code name index from aGdkKeyEvent.
    */
-  static CodeNameIndex ComputeDOMCodeNameIndex(GdkKeyEvent* aGdkKeyEvent);
+  static CodeNameIndex ComputeDOMCodeNameIndex(GdkEvent* aGdkKeyEvent);
 
   static guint ConvertGeckoKeyCodeToGDKKeyval(const nsAString& aKeyCode);
 
@@ -128,7 +128,7 @@ class KeymapWrapper {
    * @param aIsProcessedByIME true if aGdkKeyEvent is handled by IME.
    */
   static void InitKeyEvent(WidgetKeyboardEvent& aKeyEvent,
-                           GdkKeyEvent* aGdkKeyEvent, bool aIsProcessedByIME);
+                           GdkEvent* aGdkKeyEvent, bool aIsProcessedByIME);
 
   /**
    * DispatchKeyDownOrKeyUpEvent() dispatches eKeyDown or eKeyUp event.
@@ -142,7 +142,7 @@ class KeymapWrapper {
    *                          Otherwise, false.
    */
   static bool DispatchKeyDownOrKeyUpEvent(nsWindow* aWindow,
-                                          GdkKeyEvent* aGdkKeyEvent,
+                                          GdkEvent* aGdkKeyEvent,
                                           bool aIsProcessedByIME,
                                           bool* aIsCancelled);
 
@@ -167,7 +167,7 @@ class KeymapWrapper {
    *                          eKeyPress events).
    * @param aGdkKeyEvent      Receivied GDK_KEY_PRESS event.
    */
-  static void HandleKeyPressEvent(nsWindow* aWindow, GdkKeyEvent* aGdkKeyEvent);
+  static void HandleKeyPressEvent(nsWindow* aWindow, GdkEvent* aGdkKeyEvent);
 
   /**
    * GDK_KEY_RELEASE event handler.
@@ -177,7 +177,7 @@ class KeymapWrapper {
    * @return                  true if an event is dispatched.  Otherwise, false.
    */
   static bool HandleKeyReleaseEvent(nsWindow* aWindow,
-                                    GdkKeyEvent* aGdkKeyEvent);
+                                    GdkEvent* aGdkKeyEvent);
 
   /**
    * WillDispatchKeyboardEvent() is called via
@@ -190,7 +190,7 @@ class KeymapWrapper {
    *                          aKeyEvent.
    */
   static void WillDispatchKeyboardEvent(WidgetKeyboardEvent& aKeyEvent,
-                                        GdkKeyEvent* aGdkKeyEvent);
+                                        GdkEvent* aGdkKeyEvent);
 
 #ifdef MOZ_WAYLAND
   /**
@@ -377,8 +377,8 @@ class KeymapWrapper {
    * @return                  charCode which is inputted by aGdkKeyEvent.
    *                          If failed, this returns 0.
    */
-  static uint32_t GetCharCodeFor(GdkKeyEvent* aGdkKeyEvent);
-  uint32_t GetCharCodeFor(GdkKeyEvent* aGdkKeyEvent,
+  static uint32_t GetCharCodeFor(GdkEvent* aGdkKeyEvent);
+  uint32_t GetCharCodeFor(GdkEvent* aGdkKeyEvent,
                           guint aGdkModifierState);
 
   /**
@@ -391,7 +391,7 @@ class KeymapWrapper {
    * @return                  charCode which is computed without modifiers
    *                          which prevent text input.
    */
-  uint32_t GetUnmodifiedCharCodeFor(GdkKeyEvent* aGdkKeyEvent);
+  uint32_t GetUnmodifiedCharCodeFor(GdkEvent* aGdkKeyEvent);
 
   /**
    * GetKeyLevel() returns level of the aGdkKeyEvent in mGdkKeymap.
@@ -400,7 +400,7 @@ class KeymapWrapper {
    * @return                  Using level.  Typically, this is 0 or 1.
    *                          If failed, this returns -1.
    */
-  gint GetKeyLevel(GdkKeyEvent* aGdkKeyEvent);
+  gint GetKeyLevel(GdkEvent* aGdkKeyEvent);
 
   /**
    * GetFirstLatinGroup() returns group of mGdkKeymap which can input an
@@ -444,7 +444,7 @@ class KeymapWrapper {
    * ignoring the modifier state except NumLock. (NumLock is a key to change
    * some key's meaning.)
    */
-  static guint GetGDKKeyvalWithoutModifier(GdkKeyEvent* aGdkKeyEvent);
+  static guint GetGDKKeyvalWithoutModifier(GdkEvent* aGdkKeyEvent);
 
   /**
    * GetDOMKeyCodeFromKeyPairs() returns DOM keycode for aGdkKeyval if
@@ -474,15 +474,15 @@ class KeymapWrapper {
    *                          widget may have been destroyed.
    */
   static bool MaybeDispatchContextMenuEvent(nsWindow* aWindow,
-                                             GdkKeyEvent* aEvent);
+                                             GdkEvent* aEvent);
 
   /**
    * See the document of WillDispatchKeyboardEvent().
    */
   void WillDispatchKeyboardEventInternal(WidgetKeyboardEvent& aKeyEvent,
-                                         GdkKeyEvent* aGdkKeyEvent);
+                                         GdkEvent* aGdkKeyEvent);
 
-  static guint GetModifierState(GdkKeyEvent* aGdkKeyEvent,
+  static guint GetModifierState(GdkEvent* aGdkKeyEvent,
                                 KeymapWrapper* aWrapper);
 
 #ifdef MOZ_WAYLAND
