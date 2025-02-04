@@ -39,7 +39,7 @@ static inline const char* ToChar(bool aBool) {
   return aBool ? "true" : "false";
 }
 
-static const char* GetEventType(GdkKeyEvent* aKeyEvent) {
+static const char* GetEventType(GdkEvent* aKeyEvent) {
   GdkEventType type = gdk_event_get_event_type(GDK_EVENT(aKeyEvent));
   switch (type) {
     case GDK_KEY_PRESS:
@@ -603,7 +603,7 @@ IMContextWrapper::WillDispatchKeyboardEvent(
     WidgetKeyboardEvent& aKeyboardEvent, uint32_t aIndexOfKeypress,
     void* aData) {
   KeymapWrapper::WillDispatchKeyboardEvent(aKeyboardEvent,
-                                           static_cast<GdkKeyEvent*>(aData));
+                                           static_cast<GdkEvent*>(aData));
 }
 
 TextEventDispatcher* IMContextWrapper::GetTextEventDispatcher() {
@@ -762,7 +762,7 @@ void IMContextWrapper::OnBlurWindow(nsWindow* aWindow) {
 }
 
 KeyHandlingState IMContextWrapper::OnKeyEvent(
-    nsWindow* aCaller, GdkKeyEvent* aEvent,
+    nsWindow* aCaller, GdkEvent* aEvent,
     bool aKeyboardEventWasDispatched /* = false */) {
   MOZ_ASSERT(aEvent, "aEvent must be non-null");
 
@@ -1074,7 +1074,7 @@ KeyHandlingState IMContextWrapper::OnKeyEvent(
   }
 
   if (gdk_event_get_event_type(GDK_EVENT(aEvent)) == GDK_KEY_RELEASE) {
-    if (GdkKeyEvent* pendingKeyPressEvent =
+    if (GdkEvent* pendingKeyPressEvent =
             mPostingKeyEvents.GetCorrespondingKeyPressEvent(aEvent)) {
       MOZ_LOG(gIMELog, LogLevel::Warning,
               ("0x%p   OnKeyEvent(), forgetting a pending GDK_KEY_PRESS event "
@@ -1644,9 +1644,9 @@ void IMContextWrapper::OnStartCompositionNative(GtkIMContext* aContext) {
   // GDK_KEY_PRESS event.  In that case, we should handle composition with
   // emulating the usual case, i.e., this is called in the stack of
   // OnKeyEvent().
-  Maybe<AutoRestore<GdkKeyEvent*>> maybeRestoreProcessingKeyEvent;
+  Maybe<AutoRestore<GdkEvent*>> maybeRestoreProcessingKeyEvent;
   if (!mProcessingKeyEvent && !mPostingKeyEvents.IsEmpty()) {
-    GdkKeyEvent* keyEvent = mPostingKeyEvents.GetFirstEvent();
+    GdkEvent* keyEvent = mPostingKeyEvents.GetFirstEvent();
     if (keyEvent && gdk_event_get_event_type(GDK_EVENT(keyEvent)) == GDK_KEY_PRESS &&
         KeymapWrapper::ComputeDOMKeyNameIndex(keyEvent) ==
             KEY_NAME_INDEX_USE_STRING) {
@@ -1756,9 +1756,9 @@ void IMContextWrapper::OnChangeCompositionNative(GtkIMContext* aContext) {
   // GDK_KEY_PRESS event.  In that case, we should handle composition with
   // emulating the usual case, i.e., this is called in the stack of
   // OnKeyEvent().
-  Maybe<AutoRestore<GdkKeyEvent*>> maybeRestoreProcessingKeyEvent;
+  Maybe<AutoRestore<GdkEvent*>> maybeRestoreProcessingKeyEvent;
   if (!mProcessingKeyEvent && !mPostingKeyEvents.IsEmpty()) {
-    GdkKeyEvent* keyEvent = mPostingKeyEvents.GetFirstEvent();
+    GdkEvent* keyEvent = mPostingKeyEvents.GetFirstEvent();
     if (keyEvent && gdk_event_get_event_type(GDK_EVENT(keyEvent)) == GDK_KEY_PRESS &&
         KeymapWrapper::ComputeDOMKeyNameIndex(keyEvent) ==
             KEY_NAME_INDEX_USE_STRING) {
@@ -1902,9 +1902,9 @@ void IMContextWrapper::OnCommitCompositionNative(GtkIMContext* aContext,
   // GDK_KEY_PRESS event.  In that case, we should handle composition with
   // emulating the usual case, i.e., this is called in the stack of
   // OnKeyEvent().
-  Maybe<AutoRestore<GdkKeyEvent*>> maybeRestoreProcessingKeyEvent;
+  Maybe<AutoRestore<GdkEvent*>> maybeRestoreProcessingKeyEvent;
   if (!mProcessingKeyEvent && !mPostingKeyEvents.IsEmpty()) {
-    GdkKeyEvent* keyEvent = mPostingKeyEvents.GetFirstEvent();
+    GdkEvent* keyEvent = mPostingKeyEvents.GetFirstEvent();
     if (keyEvent && gdk_event_get_event_type(GDK_EVENT(keyEvent)) == GDK_KEY_PRESS &&
         KeymapWrapper::ComputeDOMKeyNameIndex(keyEvent) ==
             KEY_NAME_INDEX_USE_STRING) {
@@ -2093,7 +2093,7 @@ bool IMContextWrapper::MaybeDispatchKeyEventAsProcessedByIME(
     // sent by IME without sending key event to us.  In such case, we
     // should dispatch keyboard event for the last key event which was
     // posted to other IME process.
-    GdkKeyEvent* sourceEvent = mProcessingKeyEvent
+    GdkEvent* sourceEvent = mProcessingKeyEvent
                                    ? mProcessingKeyEvent
                                    : mPostingKeyEvents.GetFirstEvent();
 
