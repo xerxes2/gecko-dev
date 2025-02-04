@@ -1095,7 +1095,7 @@ void KeymapWrapper::InitInputEvent(WidgetInputEvent& aInputEvent,
 }
 
 /* static */
-uint32_t KeymapWrapper::ComputeDOMKeyCode(GdkKeyEvent* aGdkKeyEvent) {
+uint32_t KeymapWrapper::ComputeDOMKeyCode(GdkEvent* aGdkKeyEvent) {
   // If the keyval indicates it's a modifier key, we should use unshifted
   // key's modifier keyval.
   //guint keyval = aGdkKeyEvent->keyval;
@@ -1299,7 +1299,7 @@ uint32_t KeymapWrapper::ComputeDOMKeyCode(GdkKeyEvent* aGdkKeyEvent) {
   return WidgetKeyboardEvent::GetFallbackKeyCodeOfPunctuationKey(code);
 }
 
-KeyNameIndex KeymapWrapper::ComputeDOMKeyNameIndex(GdkKeyEvent* aGdkKeyEvent) {
+KeyNameIndex KeymapWrapper::ComputeDOMKeyNameIndex(GdkEvent* aGdkKeyEvent) {
   guint keyval = gdk_key_event_get_keyval(GDK_EVENT(aGdkKeyEvent));
   switch (keyval) {
 #define NS_NATIVE_KEY_TO_DOM_KEY_NAME_INDEX(aNativeKey, aKeyNameIndex) \
@@ -1318,7 +1318,7 @@ KeyNameIndex KeymapWrapper::ComputeDOMKeyNameIndex(GdkKeyEvent* aGdkKeyEvent) {
 }
 
 /* static */
-CodeNameIndex KeymapWrapper::ComputeDOMCodeNameIndex(GdkKeyEvent* aGdkKeyEvent) {
+CodeNameIndex KeymapWrapper::ComputeDOMCodeNameIndex(GdkEvent* aGdkKeyEvent) {
   guint keycode = gdk_key_event_get_keycode(GDK_EVENT(aGdkKeyEvent));
   switch (keycode) {
 #define NS_NATIVE_KEY_TO_DOM_CODE_NAME_INDEX(aNativeKey, aCodeNameIndex) \
@@ -1338,7 +1338,7 @@ CodeNameIndex KeymapWrapper::ComputeDOMCodeNameIndex(GdkKeyEvent* aGdkKeyEvent) 
 
 /* static */
 bool KeymapWrapper::DispatchKeyDownOrKeyUpEvent(nsWindow* aWindow,
-                                                GdkKeyEvent* aGdkKeyEvent,
+                                                GdkEvent* aGdkKeyEvent,
                                                 bool aIsProcessedByIME,
                                                 bool* aIsCancelled) {
   MOZ_ASSERT(aIsCancelled, "aIsCancelled must not be nullptr");
@@ -1389,7 +1389,7 @@ bool KeymapWrapper::DispatchKeyDownOrKeyUpEvent(
 
 /* static */
 bool KeymapWrapper::MaybeDispatchContextMenuEvent(nsWindow* aWindow,
-                                                   GdkKeyEvent* aEvent) {
+                                                   GdkEvent* aEvent) {
   KeyNameIndex keyNameIndex = ComputeDOMKeyNameIndex(aEvent);
 
   // Shift+F10 and ContextMenu should cause eContextMenu event.
@@ -1439,7 +1439,7 @@ bool KeymapWrapper::MaybeDispatchContextMenuEvent(nsWindow* aWindow,
 
 /* static*/
 void KeymapWrapper::HandleKeyPressEvent(nsWindow* aWindow,
-                                        GdkKeyEvent* aGdkKeyEvent) {
+                                        GdkEvent* aGdkKeyEvent) {
   guint32 time = gdk_event_get_time(GDK_EVENT(aGdkKeyEvent));
   GdkModifierType state = gdk_event_get_modifier_state(GDK_EVENT(aGdkKeyEvent));
   guint keyval = gdk_key_event_get_keyval(GDK_EVENT(aGdkKeyEvent));
@@ -1650,7 +1650,7 @@ void KeymapWrapper::HandleKeyPressEvent(nsWindow* aWindow,
 
 /* static */
 bool KeymapWrapper::HandleKeyReleaseEvent(nsWindow* aWindow,
-                                          GdkKeyEvent* aGdkKeyEvent) {
+                                          GdkEvent* aGdkKeyEvent) {
   guint32 time = gdk_event_get_time(GDK_EVENT(aGdkKeyEvent));
   GdkModifierType state = gdk_event_get_modifier_state(GDK_EVENT(aGdkKeyEvent));
   guint keyval = gdk_key_event_get_keyval(GDK_EVENT(aGdkKeyEvent));
@@ -1695,7 +1695,7 @@ bool KeymapWrapper::HandleKeyReleaseEvent(nsWindow* aWindow,
   return true;
 }
 
-guint KeymapWrapper::GetModifierState(GdkKeyEvent* aGdkKeyEvent,
+guint KeymapWrapper::GetModifierState(GdkEvent* aGdkKeyEvent,
                                       KeymapWrapper* aWrapper) {
   guint keyval = gdk_key_event_get_keyval(GDK_EVENT(aGdkKeyEvent));
   GdkModifierType mod_state = gdk_event_get_modifier_state(GDK_EVENT(aGdkKeyEvent));
@@ -1774,7 +1774,7 @@ guint KeymapWrapper::GetModifierState(GdkKeyEvent* aGdkKeyEvent,
 
 /* static */
 void KeymapWrapper::InitKeyEvent(WidgetKeyboardEvent& aKeyEvent,
-                                 GdkKeyEvent* aGdkKeyEvent,
+                                 GdkEvent* aGdkKeyEvent,
                                  bool aIsProcessedByIME) {
   MOZ_ASSERT(
       !aIsProcessedByIME || aKeyEvent.mMessage != eKeyPress,
@@ -1906,7 +1906,7 @@ void KeymapWrapper::InitKeyEvent(WidgetKeyboardEvent& aKeyEvent,
 }
 
 /* static */
-uint32_t KeymapWrapper::GetCharCodeFor(GdkKeyEvent* aGdkKeyEvent) {
+uint32_t KeymapWrapper::GetCharCodeFor(GdkEvent* aGdkKeyEvent) {
   // Anything above 0xf000 is considered a non-printable
   // Exception: directly encoded UCS characters
   guint keyval = gdk_key_event_get_keyval(GDK_EVENT(aGdkKeyEvent));
@@ -1968,7 +1968,7 @@ uint32_t KeymapWrapper::GetCharCodeFor(GdkKeyEvent* aGdkKeyEvent) {
   return 0;
 }
 
-uint32_t KeymapWrapper::GetCharCodeFor(GdkKeyEvent* aGdkKeyEvent,
+uint32_t KeymapWrapper::GetCharCodeFor(GdkEvent* aGdkKeyEvent,
                                        guint aGdkModifierState) {
   /*
   guint keyval;
@@ -1986,7 +1986,7 @@ uint32_t KeymapWrapper::GetCharCodeFor(GdkKeyEvent* aGdkKeyEvent,
   return GetCharCodeFor(aGdkKeyEvent);
 }
 
-uint32_t KeymapWrapper::GetUnmodifiedCharCodeFor(GdkKeyEvent* aGdkKeyEvent) {
+uint32_t KeymapWrapper::GetUnmodifiedCharCodeFor(GdkEvent* aGdkKeyEvent) {
   GdkModifierType mod_state = gdk_event_get_modifier_state(GDK_EVENT(aGdkKeyEvent));
   guint state =
       mod_state &
@@ -2009,7 +2009,7 @@ uint32_t KeymapWrapper::GetUnmodifiedCharCodeFor(GdkKeyEvent* aGdkKeyEvent) {
   return GetCharCodeFor(aGdkKeyEvent, GdkModifierType(stateWithoutAltGraph));
 }
 
-gint KeymapWrapper::GetKeyLevel(GdkKeyEvent* aGdkKeyEvent) {
+gint KeymapWrapper::GetKeyLevel(GdkEvent* aGdkKeyEvent) {
   guint level = gdk_key_event_get_level(GDK_EVENT(aGdkKeyEvent));
   /*
   if (!gdk_keymap_translate_keyboard_state(
@@ -2083,7 +2083,7 @@ bool KeymapWrapper::IsBasicLatinLetterOrNumeral(uint32_t aCharCode) {
 }
 
 /* static */
-guint KeymapWrapper::GetGDKKeyvalWithoutModifier(GdkKeyEvent* aGdkKeyEvent) {
+guint KeymapWrapper::GetGDKKeyvalWithoutModifier(GdkEvent* aGdkKeyEvent) {
   //KeymapWrapper* keymapWrapper = GetInstance();
   guint keyval;
   GdkModifierType* modifiers = nullptr;
@@ -2521,12 +2521,12 @@ uint32_t KeymapWrapper::GetDOMKeyCodeFromKeyPairs(guint aGdkKeyval) {
 }
 
 void KeymapWrapper::WillDispatchKeyboardEvent(WidgetKeyboardEvent& aKeyEvent,
-                                              GdkKeyEvent* aGdkKeyEvent) {
+                                              GdkEvent* aGdkKeyEvent) {
   GetInstance()->WillDispatchKeyboardEventInternal(aKeyEvent, aGdkKeyEvent);
 }
 
 void KeymapWrapper::WillDispatchKeyboardEventInternal(
-    WidgetKeyboardEvent& aKeyEvent, GdkKeyEvent* aGdkKeyEvent) {
+    WidgetKeyboardEvent& aKeyEvent, GdkEvent* aGdkKeyEvent) {
   if (!aGdkKeyEvent) {
     // If aGdkKeyEvent is nullptr, we're trying to dispatch a fake keyboard
     // event in such case, we don't need to set alternative char codes.
