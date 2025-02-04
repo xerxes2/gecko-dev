@@ -258,21 +258,21 @@ class nsWindow final : public nsBaseWidget {
   void OnUnmap();
   void OnSizeAllocate(GtkAllocation* aAllocation);
   void OnDeleteEvent();
-  void OnEnterNotifyEvent(GdkCrossingEvent* aEvent);
-  void OnLeaveNotifyEvent(GdkCrossingEvent* aEvent);
-  void OnMotionNotifyEvent(GdkMotionEvent* aEvent);
-  void OnButtonPressEvent(GdkButtonEvent* aEvent);
-  void OnButtonReleaseEvent(GdkButtonEvent* aEvent);
-  void OnContainerFocusInEvent(GdkFocusEvent* aEvent);
-  void OnContainerFocusOutEvent(GdkFocusEvent* aEvent);
-  gboolean OnKeyPressEvent(GdkKeyEvent* aEvent);
-  gboolean OnKeyReleaseEvent(GdkKeyEvent* aEvent);
+  void OnEnterNotifyEvent(GdkEvent* aEvent);
+  void OnLeaveNotifyEvent(GdkEvent* aEvent);
+  void OnMotionNotifyEvent(GdkEvent* aEvent);
+  void OnButtonPressEvent(GdkEvent* aEvent);
+  void OnButtonReleaseEvent(GdkEvent* aEvent);
+  void OnContainerFocusInEvent(GdkEvent* aEvent);
+  void OnContainerFocusOutEvent(GdkEvent* aEvent);
+  gboolean OnKeyPressEvent(GdkEvent* aEvent);
+  gboolean OnKeyReleaseEvent(GdkEvent* aEvent);
 
-  void OnScrollEvent(GdkScrollEvent* aEvent);
+  void OnScrollEvent(GdkEvent* aEvent);
   void OnSmoothScrollEvent(uint32_t aTime, float aDeltaX, float aDeltaY);
 
   //void OnVisibilityNotifyEvent(GdkVisibilityState aState);
-  //void OnWindowStateEvent(GtkWidget* aWidget, GdkEventWindowState* aEvent);
+  void OnWindowStateEvent(GtkWidget* aWidget, GdkToplevelState state);
   //void OnDragDataReceivedEvent(GtkWidget* aWidget, GdkDrag* aDragContext,
   //                             gint aX, gint aY,
   //                             GtkSelectionData* aSelectionData, guint aInfo,
@@ -522,13 +522,13 @@ class nsWindow final : public nsBaseWidget {
   LayoutDeviceIntSize GetSafeWindowSize(LayoutDeviceIntSize aSize);
 
   void DispatchContextMenuEventFromMouseEvent(
-      uint16_t domButton, GdkButtonEvent* aEvent,
+      uint16_t domButton, GdkEvent* aEvent,
       const mozilla::LayoutDeviceIntPoint& aRefPoint);
 
-  void TryToShowNativeWindowMenu(GdkButtonEvent* aEvent);
+  void TryToShowNativeWindowMenu(GdkEvent* aEvent);
 
   bool DoTitlebarAction(mozilla::LookAndFeel::TitlebarEvent aEvent,
-                        GdkButtonEvent* aButtonEvent);
+                        GdkEvent* aButtonEvent);
 
   void WaylandStartVsync();
   void WaylandStopVsync();
@@ -541,7 +541,7 @@ class nsWindow final : public nsBaseWidget {
   void SetDefaultIcon(void);
   void SetWindowDecoration(BorderStyle aStyle);
   void InitButtonEvent(mozilla::WidgetMouseEvent& aEvent,
-                       GdkButtonEvent* aGdkEvent,
+                       GdkEvent* aGdkEvent,
                        const mozilla::LayoutDeviceIntPoint& aRefPoint);
   bool CheckForRollup(gdouble aMouseX, gdouble aMouseY, bool aIsWheel,
                       bool aAlwaysRollup);
@@ -711,6 +711,8 @@ class nsWindow final : public nsBaseWidget {
   bool mHasReceivedSizeAllocate : 1;
   bool mWidgetCursorLocked : 1;
   bool mUndecorated : 1;
+  // State of toplevel surface
+  GdkToplevelState mToplevelState = GDK_TOPLEVEL_STATE_SUSPENDED;
 
   /*  Gkt creates popup in two incarnations - wl_subsurface and xdg_popup.
    *  Kind of popup is choosen before GdkWindow is mapped so we can change
@@ -823,7 +825,7 @@ class nsWindow final : public nsBaseWidget {
 
   bool DragInProgress(void);
 
-  void DispatchMissedButtonReleases(GdkCrossingEvent* aGdkEvent);
+  void DispatchMissedButtonReleases(GdkEvent* aGdkEvent);
 
   void ConfigureCompositor();
 
@@ -1015,7 +1017,7 @@ class nsWindow final : public nsBaseWidget {
 
   void KioskLockOnMonitor();
 
-  void EmulateResizeDrag(GdkMotionEvent* aEvent);
+  void EmulateResizeDrag(GdkEvent* aEvent);
 
   void RequestRepaint(LayoutDeviceIntRegion& aRepaintRegion);
 
