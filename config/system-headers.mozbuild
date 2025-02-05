@@ -305,6 +305,7 @@ system_headers = [
     "gdk/gdkkeysyms.h",
     "gdk/gdkprivate.h",
     "gdk/gdkwayland.h",
+    "gdk/wayland/gdkwayland.h",
     "gdk-pixbuf/gdk-pixbuf.h",
     "Gestalt.h",
     "getopt.h",
