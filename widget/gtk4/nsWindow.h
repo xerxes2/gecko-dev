@@ -358,7 +358,7 @@ class nsWindow final : public nsBaseWidget {
   void SetTransparencyMode(TransparencyMode aMode) override;
   TransparencyMode GetTransparencyMode() override;
   void SetInputRegion(const InputRegion&) override;
-
+  /*
   nsresult SynthesizeNativeMouseEvent(LayoutDeviceIntPoint aPoint,
                                       NativeMouseMessage aNativeMessage,
                                       mozilla::MouseButton aButton,
@@ -394,7 +394,7 @@ class nsWindow final : public nsBaseWidget {
                                        double aDeltaX, double aDeltaY,
                                        int32_t aModifierFlags,
                                        nsIObserver* aObserver) override;
-
+  */
   void GetCompositorWidgetInitData(
       mozilla::widget::CompositorWidgetInitData* aInitData) override;
 
@@ -454,6 +454,7 @@ class nsWindow final : public nsBaseWidget {
   static void TransferFocusToWaylandWindow(nsWindow* aWindow);
   void FocusWaylandWindow(const char* aTokenID);
 
+  GtkBorder* GetCSDDecorationSize(bool isPopup);
   bool GetCSDDecorationOffset(int* aDx, int* aDy);
   bool SetEGLNativeWindowSize(const LayoutDeviceIntSize& aEGLWindowSize);
   void WaylandDragWorkaround(GdkButtonEvent* aEvent);
