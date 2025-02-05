@@ -68,15 +68,16 @@ static inline CSSToLayoutDeviceScale GetWidgetScaleFactor(nsIFrame* aFrame) {
 }
 
 nsNativeThemeGTK::nsNativeThemeGTK() : Theme(ScrollbarStyle()) {
-  if (moz_gtk_init() != MOZ_GTK_SUCCESS) {
-    memset(mDisabledWidgetTypes, 0xff, sizeof(mDisabledWidgetTypes));
-    return;
-  }
+  //if (moz_gtk_init() != MOZ_GTK_SUCCESS) {
+  //  memset(mDisabledWidgetTypes, 0xff, sizeof(mDisabledWidgetTypes));
+  //  return;
+  //}
 
   ThemeChanged();
 }
 
-nsNativeThemeGTK::~nsNativeThemeGTK() { moz_gtk_shutdown(); }
+nsNativeThemeGTK::~nsNativeThemeGTK() { //moz_gtk_shutdown(); 
+}
 
 void nsNativeThemeGTK::RefreshWidgetWindow(nsIFrame* aFrame) {
   MOZ_ASSERT(aFrame);
@@ -572,8 +573,8 @@ static void DrawThemeWithCairo(gfxContext* aContext, DrawTarget* aDrawTarget,
         cairo_rectangle(cr, 0, 0, clipSize.width, clipSize.height);
         cairo_clip(cr);
 
-        moz_gtk_widget_paint(aGTKWidgetType, cr, &aGDKRect, &aState, aFlags,
-                             aDirection);
+        //moz_gtk_widget_paint(aGTKWidgetType, cr, &aGDKRect, &aState, aFlags,
+        //                     aDirection);
 
         cairo_destroy(cr);
       }
@@ -607,8 +608,8 @@ static void DrawThemeWithCairo(gfxContext* aContext, DrawTarget* aDrawTarget,
             }
           }
 
-          moz_gtk_widget_paint(aGTKWidgetType, cr, &aGDKRect, &aState, aFlags,
-                               aDirection);
+          //moz_gtk_widget_paint(aGTKWidgetType, cr, &aGDKRect, &aState, aFlags,
+          //                     aDirection);
         }
       }
 
@@ -646,9 +647,9 @@ CSSIntMargin nsNativeThemeGTK::GetExtraSizeForWidget(
       if (IsDefaultButton(aFrame)) {
         // Some themes draw a default indicator outside the widget,
         // include that in overflow
-        moz_gtk_button_get_default_overflow(&extra.top.value, &extra.left.value,
-                                            &extra.bottom.value,
-                                            &extra.right.value);
+        //moz_gtk_button_get_default_overflow(&extra.top.value, &extra.left.value,
+        //                                    &extra.bottom.value,
+        //                                    &extra.right.value);
         break;
       }
       return {};
@@ -846,9 +847,9 @@ CSSIntMargin nsNativeThemeGTK::GetCachedWidgetBorder(
     if (mBorderCacheValid[cacheIndex] & cacheBit) {
       result = mBorderCache[gtkWidgetType];
     } else {
-      moz_gtk_get_widget_border(gtkWidgetType, &result.left.value,
-                                &result.top.value, &result.right.value,
-                                &result.bottom.value, aDirection);
+      //moz_gtk_get_widget_border(gtkWidgetType, &result.left.value,
+      //                          &result.top.value, &result.right.value,
+      //                          &result.bottom.value, aDirection);
       if (gtkWidgetType != MOZ_GTK_DROPDOWN) {  // depends on aDirection
         mBorderCacheValid[cacheIndex] |= cacheBit;
         mBorderCache[gtkWidgetType] = result;
@@ -884,9 +885,9 @@ LayoutDeviceIntMargin nsNativeThemeGTK::GetWidgetBorder(
                                 &flags)) {
         return {};
       }
-      moz_gtk_get_tab_border(&result.left.value, &result.top.value,
-                             &result.right.value, &result.bottom.value,
-                             direction, (GtkTabFlags)flags, gtkWidgetType);
+      //moz_gtk_get_tab_border(&result.left.value, &result.top.value,
+      //                       &result.right.value, &result.bottom.value,
+      //                       direction, (GtkTabFlags)flags, gtkWidgetType);
     } break;
     default: {
       result = GetCachedWidgetBorder(aFrame, aAppearance, direction);
@@ -1002,60 +1003,60 @@ LayoutDeviceIntSize nsNativeThemeGTK::GetMinimumWidgetSize(
   switch (aAppearance) {
     case StyleAppearance::Splitter: {
       if (IsHorizontal(aFrame)) {
-        moz_gtk_splitter_get_metrics(GTK_ORIENTATION_HORIZONTAL, &result.width);
+        //moz_gtk_splitter_get_metrics(GTK_ORIENTATION_HORIZONTAL, &result.width);
       } else {
-        moz_gtk_splitter_get_metrics(GTK_ORIENTATION_VERTICAL, &result.height);
+        //moz_gtk_splitter_get_metrics(GTK_ORIENTATION_VERTICAL, &result.height);
       }
     } break;
     case StyleAppearance::RangeThumb: {
       if (IsRangeHorizontal(aFrame)) {
-        moz_gtk_get_scalethumb_metrics(GTK_ORIENTATION_HORIZONTAL,
-                                       &result.width, &result.height);
+        //moz_gtk_get_scalethumb_metrics(GTK_ORIENTATION_HORIZONTAL,
+        //                               &result.width, &result.height);
       } else {
-        moz_gtk_get_scalethumb_metrics(GTK_ORIENTATION_VERTICAL, &result.width,
-                                       &result.width);
+       // moz_gtk_get_scalethumb_metrics(GTK_ORIENTATION_VERTICAL, &result.width,
+       //                                &result.width);
       }
     } break;
     case StyleAppearance::TabScrollArrowBack:
     case StyleAppearance::TabScrollArrowForward: {
-      moz_gtk_get_tab_scroll_arrow_size(&result.width, &result.height);
+      //moz_gtk_get_tab_scroll_arrow_size(&result.width, &result.height);
     } break;
     case StyleAppearance::Checkbox:
     case StyleAppearance::Radio: {
-      const ToggleGTKMetrics* metrics = GetToggleMetrics(
-          aAppearance == StyleAppearance::Radio ? MOZ_GTK_RADIOBUTTON
-                                                : MOZ_GTK_CHECKBUTTON);
-      result.width = metrics->minSizeWithBorder.width;
-      result.height = metrics->minSizeWithBorder.height;
+      //const ToggleGTKMetrics* metrics = GetToggleMetrics(
+      //    aAppearance == StyleAppearance::Radio ? MOZ_GTK_RADIOBUTTON
+      //                                          : MOZ_GTK_CHECKBUTTON);
+      //result.width = metrics->minSizeWithBorder.width;
+      //result.height = metrics->minSizeWithBorder.height;
     } break;
     case StyleAppearance::ToolbarbuttonDropdown:
     case StyleAppearance::ButtonArrowUp:
     case StyleAppearance::ButtonArrowDown:
     case StyleAppearance::ButtonArrowNext:
     case StyleAppearance::ButtonArrowPrevious: {
-      moz_gtk_get_arrow_size(MOZ_GTK_TOOLBARBUTTON_ARROW, &result.width,
-                             &result.height);
+      //moz_gtk_get_arrow_size(MOZ_GTK_TOOLBARBUTTON_ARROW, &result.width,
+      //                       &result.height);
     } break;
     case StyleAppearance::MozWindowButtonClose: {
-      const ToolbarButtonGTKMetrics* metrics =
-          GetToolbarButtonMetrics(MOZ_GTK_HEADER_BAR_BUTTON_CLOSE);
-      result.width = metrics->minSizeWithBorder.width;
-      result.height = metrics->minSizeWithBorder.height;
+      //const ToolbarButtonGTKMetrics* metrics =
+      //    GetToolbarButtonMetrics(MOZ_GTK_HEADER_BAR_BUTTON_CLOSE);
+      //result.width = metrics->minSizeWithBorder.width;
+      //result.height = metrics->minSizeWithBorder.height;
       break;
     }
     case StyleAppearance::MozWindowButtonMinimize: {
-      const ToolbarButtonGTKMetrics* metrics =
-          GetToolbarButtonMetrics(MOZ_GTK_HEADER_BAR_BUTTON_MINIMIZE);
-      result.width = metrics->minSizeWithBorder.width;
-      result.height = metrics->minSizeWithBorder.height;
+      //const ToolbarButtonGTKMetrics* metrics =
+      //    GetToolbarButtonMetrics(MOZ_GTK_HEADER_BAR_BUTTON_MINIMIZE);
+      //result.width = metrics->minSizeWithBorder.width;
+      //result.height = metrics->minSizeWithBorder.height;
       break;
     }
     case StyleAppearance::MozWindowButtonMaximize:
     case StyleAppearance::MozWindowButtonRestore: {
-      const ToolbarButtonGTKMetrics* metrics =
-          GetToolbarButtonMetrics(MOZ_GTK_HEADER_BAR_BUTTON_MAXIMIZE);
-      result.width = metrics->minSizeWithBorder.width;
-      result.height = metrics->minSizeWithBorder.height;
+      //const ToolbarButtonGTKMetrics* metrics =
+      //    GetToolbarButtonMetrics(MOZ_GTK_HEADER_BAR_BUTTON_MAXIMIZE);
+      //result.width = metrics->minSizeWithBorder.width;
+      //result.height = metrics->minSizeWithBorder.height;
       break;
     }
     case StyleAppearance::Button:
@@ -1064,7 +1065,7 @@ LayoutDeviceIntSize nsNativeThemeGTK::GetMinimumWidgetSize(
       if (aAppearance == StyleAppearance::Menulist ||
           aAppearance == StyleAppearance::MenulistButton) {
         // Include the arrow size.
-        moz_gtk_get_arrow_size(MOZ_GTK_DROPDOWN, &result.width, &result.height);
+        //moz_gtk_get_arrow_size(MOZ_GTK_DROPDOWN, &result.width, &result.height);
       }
       // else the minimum size is missing consideration of container
       // descendants; the value returned here will not be helpful, but the
@@ -1080,7 +1081,7 @@ LayoutDeviceIntSize nsNativeThemeGTK::GetMinimumWidgetSize(
     case StyleAppearance::Textfield: {
       gint contentHeight = 0;
       gint borderPaddingHeight = 0;
-      moz_gtk_get_entry_min_height(&contentHeight, &borderPaddingHeight);
+      //moz_gtk_get_entry_min_height(&contentHeight, &borderPaddingHeight);
 
       // Scale the min content height proportionately with the font-size if it's
       // smaller than the default one. This prevents <input type=text
@@ -1153,6 +1154,7 @@ NS_IMETHODIMP_(bool)
 nsNativeThemeGTK::ThemeSupportsWidget(nsPresContext* aPresContext,
                                       nsIFrame* aFrame,
                                       StyleAppearance aAppearance) {
+  return false;
   if (IsWidgetTypeDisabled(mDisabledWidgetTypes, aAppearance)) {
     return false;
   }
