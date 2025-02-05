@@ -190,8 +190,7 @@ constexpr gint kEvents =
     GDK_PROPERTY_CHANGE_MASK;
 */
 /* utility functions */
-static bool is_mouse_in_window(GdkSurface* aWindow, gdouble aMouseX,
-                               gdouble aMouseY);
+static bool is_mouse_in_window(GdkSurface* aSurface);
 
 static nsWindow* get_window_for_gtk_widget(GtkWidget* widget);
 static nsWindow* get_window_for_gdk_window(GdkSurface* window);
@@ -844,9 +843,18 @@ void nsWindow::AddCSDDecorationSize(int* aWidth, int* aHeight) {
     return;
   }
 
-  GtkBorder decorationSize = GetCSDDecorationSize(IsPopup());
-  *aWidth += decorationSize.left + decorationSize.right;
-  *aHeight += decorationSize.top + decorationSize.bottom;
+  GtkBorder* decorationSize = GetCSDDecorationSize(IsPopup());
+  *aWidth += decorationSize->left + decorationSize->right;
+  *aHeight += decorationSize->top + decorationSize->bottom;
+}
+
+GtkBorder* nsWindow::GetCSDDecorationSize(bool isPopup) {
+  GtkBorder* border = gtk_border_new();
+  border->top = 5;
+  border->right = 5;
+  border->bottom = 5;
+  border->left = 5;
+  return border;
 }
 
 #ifdef MOZ_WAYLAND
@@ -854,9 +862,9 @@ bool nsWindow::GetCSDDecorationOffset(int* aDx, int* aDy) {
   if (!DrawsToCSDTitlebar()) {
     return false;
   }
-  GtkBorder decorationSize = GetCSDDecorationSize(IsPopup());
-  *aDx = decorationSize.left;
-  *aDy = decorationSize.top;
+  GtkBorder* decorationSize = GetCSDDecorationSize(IsPopup());
+  *aDx = decorationSize->left;
+  *aDy = decorationSize->top;
   return true;
 }
 #endif
@@ -7301,7 +7309,7 @@ bool nsWindow::CheckForRollup(gdouble aMouseX, gdouble aMouseY, bool aIsWheel,
 
   auto* rollupWindow =
       (GdkSurface*)rollupWidget->GetNativeData(NS_NATIVE_WINDOW);
-  if (!aAlwaysRollup && is_mouse_in_window(rollupWindow, aMouseX, aMouseY)) {
+  if (!aAlwaysRollup && is_mouse_in_window(rollupWindow)) {
     return false;
   }
   bool retVal = false;
@@ -7324,7 +7332,7 @@ bool nsWindow::CheckForRollup(gdouble aMouseX, gdouble aMouseY, bool aIsWheel,
     for (unsigned long i = 0; i < widgetChain.Length(); ++i) {
       nsIWidget* widget = widgetChain[i];
       auto* currWindow = (GdkSurface*)widget->GetNativeData(NS_NATIVE_WINDOW);
-      if (is_mouse_in_window(currWindow, aMouseX, aMouseY)) {
+      if (is_mouse_in_window(currWindow)) {
         // Don't roll up if the mouse event occurred within a menu of the same
         // type.
         // If the mouse event occurred in a menu higher than that, roll up, but
@@ -7416,56 +7424,27 @@ static nsWindow* get_window_for_gdk_window(GdkSurface* window) {
   gpointer user_data = g_object_get_data(G_OBJECT(window), "nsWindow");
   return static_cast<nsWindow*>(user_data);
 }
-/*
-static bool is_mouse_in_window(GdkSurface* aWindow, gdouble aMouseX,
-                               gdouble aMouseY) {
-  GdkSurface* window = aWindow;
-  if (!window) {
+
+static bool is_mouse_in_window(GdkSurface* aSurface) {
+  GdkDisplay* display = gdk_display_get_default();
+  if (!display) {
     return false;
   }
-
-  gint x = 0;
-  gint y = 0;
-
-  {
-    gint offsetX = 0;
-    gint offsetY = 0;
-
-    while (window) {
-      gint tmpX = 0;
-      gint tmpY = 0;
-
-      gdk_window_get_position(window, &tmpX, &tmpY);
-      GtkWidget* widget = get_gtk_widget_for_gdk_window(window);
-
-      // if this is a window, compute x and y given its origin and our
-      // offset
-      if (GTK_IS_WINDOW(widget)) {
-        x = tmpX + offsetX;
-        y = tmpY + offsetY;
-        break;
-      }
-
-      offsetX += tmpX;
-      offsetY += tmpY;
-      window = gdk_window_get_parent(window);
-    }
+  GdkSeat* seat = gdk_display_get_default_seat(display);
+  if (!seat) {
+    return false;
   }
-
-  gint margin = 0;
-  if (nsWindow* w = get_window_for_gdk_window(aWindow)) {
-    margin = w->GetInputRegionMarginInGdkCoords();
+  GdkDevice* pointer = gdk_seat_get_pointer(seat);
+  if (!pointer) {
+    return false;
   }
-
-  x += margin;
-  y += margin;
-
-  gint w = gdk_window_get_width(aWindow) - margin;
-  gint h = gdk_window_get_height(aWindow) - margin;
-
-  return aMouseX > x && aMouseX < x + w && aMouseY > y && aMouseY < y + h;
+  double x, y = 0.0;
+  GdkModifierType* mask = nullptr;
+  bool hasPointer = gdk_surface_get_device_position(aSurface, pointer, &x, &y, mask);
+  g_free(mask);
+  return hasPointer;
 }
-
+/*
 static GtkWidget* get_gtk_widget_for_gdk_window(GdkWindow* window) {
   gpointer user_data = nullptr;
   gdk_window_get_user_data(window, &user_data);
