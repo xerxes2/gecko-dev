@@ -278,8 +278,8 @@ class nsWindow final : public nsBaseWidget {
   //                             GtkSelectionData* aSelectionData, guint aInfo,
   //                             guint aTime, gpointer aData);
   gboolean OnPropertyNotifyEvent(GtkWidget* aWidget, GdkEvent* aEvent);
-  gboolean OnTouchEvent(GdkTouchEvent* aEvent);
-  gboolean OnTouchpadPinchEvent(GdkTouchpadEvent* aEvent);
+  gboolean OnTouchEvent(GdkEvent* aEvent);
+  gboolean OnTouchpadPinchEvent(GdkEvent* aEvent);
   void OnTouchpadHoldEvent(GdkTouchpadGesturePhase aPhase, guint aTime,
                            uint32_t aFingers);
 
@@ -937,13 +937,14 @@ class nsWindow final : public nsBaseWidget {
   struct LastMouseCoordinates {
     template <typename Event>
     void Set(Event* aEvent) {
-      mX = aEvent->x;
-      mY = aEvent->y;
-      mRootX = aEvent->x_root;
-      mRootY = aEvent->y_root;
+      gdk_event_get_position(aEvent, &mX, &mY);
+      //mX = aEvent->x;
+      //mY = aEvent->y;
+      //mRootX = aEvent->x_root;
+      //mRootY = aEvent->y_root;
     }
 
-    float mX = 0.0f, mY = 0.0f;
+    double mX = 0.0f, mY = 0.0f;
     float mRootX = 0.0f, mRootY = 0.0f;
   } mLastMouseCoordinates;
 
