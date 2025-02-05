@@ -211,8 +211,8 @@ static gboolean leave_notify_event_cb(GtkEventControllerMotion* controller,
                                       gdouble pos_x, gdouble pos_y);
 static gboolean motion_notify_event_cb(GtkEventControllerMotion* controller,
                                       gdouble pos_x, gdouble pos_y);
-MOZ_CAN_RUN_SCRIPT static gboolean button_press_event_cb(GtkGestureClick* gesture, gint n_press,
-                                      gdouble pos_x, gdouble pos_y);
+MOZ_CAN_RUN_SCRIPT static gboolean button_press_event_cb(GtkGestureClick* gesture,
+                                 gint n_press, double pos_x, gdouble pos_y);
 static gboolean button_release_event_cb(GtkGestureClick* gesture, gint n_press,
                                       gdouble pos_x, gdouble pos_y);
 static gboolean focus_in_event_cb(GtkEventControllerFocus* controller);
@@ -240,7 +240,8 @@ static void widget_composited_changed_cb(GtkWidget* widget, gpointer user_data);
 
 static void scale_changed_cb(GtkWidget* widget, GParamSpec* aPSpec,
                              gpointer aPointer);
-static gboolean touch_event_cb(GtkWidget* aWidget, GdkTouchEvent* aEvent);
+static gboolean touch_event_cb(GtkGesture* gesture,
+                               GdkEventSequence* sequence);
 static gboolean generic_event_cb(GtkWidget* widget, GdkEvent* aEvent);
 static void widget_destroy_cb(GtkWidget* widget, gpointer user_data);
 
@@ -4248,16 +4249,19 @@ Maybe<GdkSurfaceEdge> nsWindow::CheckResizerEdge(
 
 template <typename Event>
 static LayoutDeviceIntPoint GetRefPoint(nsWindow* aWindow, Event* aEvent) {
-  if (aEvent->window == aWindow->GetGdkWindow()) {
+  double x, y;
+  if (gdk_event_get_surface(aEvent) == aWindow->GetGdkWindow()) {
     // we are the window that the event happened on so no need for expensive
     // WidgetToScreenOffset
-    return aWindow->GdkEventCoordsToDevicePixels(aEvent->x, aEvent->y);
+    gdk_event_get_position(aEvent, &x, &y);
+    return aWindow->GdkEventCoordsToDevicePixels(x, y);
   }
+  return aWindow->GdkEventCoordsToDevicePixels(x, y);
   // XXX we're never quite sure which GdkWindow the event came from due to our
   // custom bubbling in scroll_event_cb(), so use ScreenToWidget to translate
   // the screen root coordinates into coordinates relative to this widget.
-  return aWindow->GdkEventCoordsToDevicePixels(aEvent->x_root, aEvent->y_root) -
-         aWindow->WidgetToScreenOffset();
+  //return aWindow->GdkEventCoordsToDevicePixels(aEvent->x_root, aEvent->y_root) -
+  //       aWindow->WidgetToScreenOffset();
 }
 
 void nsWindow::EmulateResizeDrag(GdkEvent* aEvent) {
@@ -5464,7 +5468,7 @@ bool nsWindow::IsHandlingTouchSequence(GdkEventSequence* aSequence) {
   return mHandleTouchEvent && mTouches.Contains(aSequence);
 }
 
-gboolean nsWindow::OnTouchpadPinchEvent(GdkTouchpadEvent* aGdkEvent) {
+gboolean nsWindow::OnTouchpadPinchEvent(GdkEvent* aGdkEvent) {
   if (!StaticPrefs::apz_gtk_touchpad_pinch_enabled()) {
     return TRUE;
   }
@@ -5559,7 +5563,7 @@ void nsWindow::OnTouchpadHoldEvent(GdkTouchpadGesturePhase aPhase, guint aTime,
   DispatchPanGesture(panEvent);
 }
 
-gboolean nsWindow::OnTouchEvent(GdkTouchEvent* aGdkEvent) {
+gboolean nsWindow::OnTouchEvent(GdkEvent* aGdkEvent) {
   double pos_x, pos_y;
   gdk_event_get_position(GDK_EVENT(aGdkEvent), &pos_x, &pos_y);
   guint32 time = gdk_event_get_time(GDK_EVENT(aGdkEvent));
@@ -6307,7 +6311,7 @@ nsresult nsWindow::Create(nsIWidget* aParent, const LayoutDeviceIntRect& aRect,
   // Swipe
   GtkGesture* gesture_swipe = gtk_gesture_swipe_new();
   gtk_widget_add_controller(eventWidget, GTK_EVENT_CONTROLLER(gesture_swipe));
-  g_signal_connect(eventWidget, "swipe", G_CALLBACK(touch_event_cb),
+  g_signal_connect(eventWidget, "begin", G_CALLBACK(touch_event_cb),
                    nullptr);
   // Generic events
   //g_signal_connect(eventWidget, "event", G_CALLBACK(generic_event_cb),
@@ -8172,7 +8176,7 @@ static void settings_xft_dpi_changed_cb(GtkSettings* gtk_settings,
   // DispatchResized() updates those.
   window->DispatchResized();
 }
-
+/*
 static void check_resize_cb(GtkContainer* container, gpointer user_data) {
   RefPtr<nsWindow> window = get_window_for_gtk_widget(GTK_WIDGET(container));
   if (!window) {
@@ -8180,7 +8184,7 @@ static void check_resize_cb(GtkContainer* container, gpointer user_data) {
   }
   window->OnCheckResize();
 }
-
+*/
 static void display_composited_changed_cb(GdkDisplay* display,
                                          gpointer user_data) {
   // This callback can run before gfxPlatform::Init() in rare
@@ -8211,19 +8215,25 @@ static void scale_changed_cb(GtkWidget* widget, GParamSpec* aPSpec,
   window->OnScaleEvent();
 }
 
-static gboolean touch_event_cb(GtkWidget* aWidget, GdkEventTouch* aEvent) {
-  UpdateLastInputEventTime(aEvent);
+static gboolean touch_event_cb(GtkGesture* gesture,
+                               GdkEventSequence* sequence) {
+  GdkEvent* event = gtk_event_controller_get_current_event(GTK_EVENT_CONTROLLER(gesture));
+  if (!event) {
+    return TRUE;
+  }
 
-  RefPtr<nsWindow> window = get_window_for_gdk_window(aEvent->window);
+  GtkWidget* widget = gtk_event_controller_get_widget(GTK_EVENT_CONTROLLER(gesture));
+  RefPtr<nsWindow> window = get_window_for_gtk_widget(widget);
   if (!window) {
     return FALSE;
   }
-
-  return window->OnTouchEvent(aEvent);
+  UpdateLastInputEventTime(event);
+  return window->OnTouchEvent(event);
 }
 
 // This function called generic because there is no signal specific to touchpad
 // pinch events.
+/*
 static gboolean generic_event_cb(GtkWidget* widget, GdkEvent* aEvent) {
   if (aEvent->type != GDK_TOUCHPAD_PINCH) {
     return FALSE;
@@ -8240,7 +8250,7 @@ static gboolean generic_event_cb(GtkWidget* widget, GdkEvent* aEvent) {
   }
   return window->OnTouchpadPinchEvent(event);
 }
-
+*/
 void nsWindow::GtkWidgetDestroyHandler(GtkWidget* aWidget) {
   MOZ_RELEASE_ASSERT(mIsDestroyed, "Releasing live widget!");
   if (aWidget == mShell) {
@@ -8272,14 +8282,15 @@ static LayoutDeviceIntPoint GetWindowDropPosition(nsWindow* aWindow, int aX,
   // Caused by Gtk issue https://gitlab.gnome.org/GNOME/gtk/-/issues/4437
   if (aWindow->IsWaylandPopup()) {
     int tx = 0, ty = 0;
-    gdk_window_get_position(aWindow->GetToplevelGdkWindow(), &tx, &ty);
+    tx = gdk_popup_get_position_x(GDK_POPUP(aWindow->GetToplevelSurface()));
+    ty = gdk_popup_get_position_y(GDK_POPUP(aWindow->GetToplevelSurface()));
     aX += tx;
     aY += ty;
   }
   LOGDRAG("WindowDropPosition [%d, %d]", aX, aY);
   return aWindow->GdkPointToDevicePixels({aX, aY});
 }
-
+/*
 gboolean WindowDragMotionHandler(GtkWidget* aWidget,
                                  GdkDragContext* aDragContext, gint aX, gint aY,
                                  guint aTime) {
@@ -8440,7 +8451,7 @@ static void drag_data_received_event_cb(GtkWidget* aWidget,
   window->OnDragDataReceivedEvent(aWidget, aDragContext, aX, aY, aSelectionData,
                                   aInfo, aTime, aData);
 }
-
+*/
 static nsresult initialize_prefs(void) {
   if (Preferences::HasUserValue("widget.use-aspect-ratio")) {
     gUseAspectRatio = Preferences::GetBool("widget.use-aspect-ratio", true);
@@ -8553,8 +8564,8 @@ void nsWindow::EndRemoteDrawingInRegion(
     DrawTarget* aDrawTarget, const LayoutDeviceIntRegion& aInvalidRegion) {
   mSurfaceProvider.EndRemoteDrawingInRegion(aDrawTarget, aInvalidRegion);
 }
-
-bool nsWindow::GetDragInfo(WidgetMouseEvent* aMouseEvent, GdkWindow** aWindow,
+/*
+bool nsWindow::GetDragInfo(WidgetMouseEvent* aMouseEvent, GdkSurface** aWindow,
                            gint* aButton, gint* aRootX, gint* aRootY) {
   if (aMouseEvent->mButton != MouseButton::ePrimary) {
     // we can only begin a move drag with the left mouse button
@@ -8615,7 +8626,7 @@ bool nsWindow::GetDragInfo(WidgetMouseEvent* aMouseEvent, GdkWindow** aWindow,
 
   return true;
 }
-
+*/
 nsIWidget::WindowRenderer* nsWindow::GetWindowRenderer() {
   if (mIsDestroyed) {
     // Prevent external code from triggering the re-creation of the
@@ -8732,10 +8743,10 @@ void nsWindow::SetCustomTitlebar(bool aState) {
     // Using GTK_WINDOW_POPUP rather than
     // GTK_WINDOW_TOPLEVEL in the hope that POPUP results in less
     // initialization and window manager interaction.
-    GtkWidget* tmpWindow = gtk_window_new(GTK_WINDOW_POPUP);
+    GtkWidget* tmpWindow = gtk_window_new();
     gtk_widget_realize(tmpWindow);
-
-    gtk_widget_reparent(GTK_WIDGET(mContainer), tmpWindow);
+    gtk_window_set_child(GTK_WINDOW(mShell), nullptr);
+    gtk_window_set_child(GTK_WINDOW(tmpWindow), GTK_WIDGET(mContainer));
     gtk_widget_unrealize(GTK_WIDGET(mShell));
 
     // Add a hidden titlebar widget to trigger CSD, but disable the default
@@ -8751,23 +8762,26 @@ void nsWindow::SetCustomTitlebar(bool aState) {
      * when mShell has default 1x1 size.
      */
     GtkAllocation allocation = {0, 0, 0, 0};
-    gtk_widget_get_preferred_width(GTK_WIDGET(mShell), nullptr,
-                                   &allocation.width);
-    gtk_widget_get_preferred_height(GTK_WIDGET(mShell), nullptr,
-                                    &allocation.height);
-    gtk_widget_size_allocate(GTK_WIDGET(mShell), &allocation);
+    GtkRequisition* min_size = gtk_requisition_new();
+    GtkRequisition* nat_size = gtk_requisition_new();
+    gtk_widget_get_preferred_size(GTK_WIDGET(mShell), min_size, nat_size);
+    allocation.width = min_size->width;
+    gtk_widget_size_allocate(GTK_WIDGET(mShell), &allocation, -1);
 
     gtk_widget_realize(GTK_WIDGET(mShell));
-    gtk_widget_reparent(GTK_WIDGET(mContainer), GTK_WIDGET(mShell));
+    gtk_window_set_child(GTK_WINDOW(tmpWindow), nullptr);
+    gtk_window_set_child(GTK_WINDOW(mShell), GTK_WIDGET(mContainer));
+    gtk_requisition_free(min_size);
+    gtk_requisition_free(nat_size);
 
     // Label mShell toplevel window so property_notify_event_cb callback
     // can find its way home.
-    g_object_set_data(G_OBJECT(GetToplevelGdkWindow()), "nsWindow", this);
+    g_object_set_data(G_OBJECT(GetToplevelSurface()), "nsWindow", this);
 
     if (AreBoundsSane()) {
       GdkRectangle size = DevicePixelsToGdkSizeRoundUp(mBounds.Size());
       LOG("    resize to %d x %d\n", size.width, size.height);
-      gtk_window_resize(GTK_WINDOW(mShell), size.width, size.height);
+      //gtk_window_resize(GTK_WINDOW(mShell), size.width, size.height);
     }
 
     if (visible) {
@@ -8775,7 +8789,7 @@ void nsWindow::SetCustomTitlebar(bool aState) {
       NativeShow(true);
     }
 
-    gtk_widget_destroy(tmpWindow);
+    gtk_window_destroy(GTK_WINDOW(tmpWindow));
   }
 
   // Recompute the input region (which should generally be null, but this is
@@ -8884,7 +8898,7 @@ LayoutDeviceIntPoint nsWindow::GdkEventCoordsToDevicePixels(gdouble aX,
   return LayoutDeviceIntPoint::Floor((float)(aX * scale), (float)(aY * scale));
 }
 
-LayoutDeviceIntPoint nsWindow::GdkPointToDevicePixels(const GdkPoint& aPoint) {
+LayoutDeviceIntPoint nsWindow::GdkPointToDevicePixels(const GdkRectangle& aPoint) {
   double scale = FractionalScaleFactor();
   return LayoutDeviceIntPoint::Floor((float)(aPoint.x * scale),
                                      (float)(aPoint.y * scale));
@@ -8896,7 +8910,7 @@ LayoutDeviceIntRect nsWindow::GdkRectToDevicePixels(const GdkRectangle& aRect) {
       (float)(aRect.x * scale), (float)(aRect.y * scale),
       (float)(aRect.width * scale), (float)(aRect.height * scale));
 }
-
+/*
 nsresult nsWindow::SynthesizeNativeMouseEvent(
     LayoutDeviceIntPoint aPoint, NativeMouseMessage aNativeMessage,
     MouseButton aButton, nsIWidget::Modifiers aModifierFlags,
@@ -9203,7 +9217,7 @@ nsresult nsWindow::SynthesizeNativeTouchpadPan(TouchpadGesturePhase aEventPhase,
 
   return NS_OK;
 }
-
+*/
 nsWindow::GtkWindowDecoration nsWindow::GetSystemGtkWindowDecoration() {
   static GtkWindowDecoration sGtkWindowDecoration = [] {
     // Allow MOZ_GTK_TITLEBAR_DECORATION to override our heuristics
@@ -9421,10 +9435,10 @@ void nsWindow::LockNativePointer() {
 
   GdkDisplay* display = gdk_display_get_default();
 
-  GdkDeviceManager* manager = gdk_display_get_device_manager(display);
-  MOZ_ASSERT(manager);
+  GdkSeat* seat = gdk_display_get_default_seat(display);
+  MOZ_ASSERT(seat);
 
-  GdkDevice* device = gdk_device_manager_get_client_pointer(manager);
+  GdkDevice* device = gdk_seat_get_pointer(seat);
   if (!device) {
     NS_WARNING("Could not find Wayland pointer to lock");
     return;
@@ -9433,7 +9447,7 @@ void nsWindow::LockNativePointer() {
   MOZ_ASSERT(pointer);
 
   wl_surface* surface =
-      gdk_wayland_window_get_wl_surface(GetToplevelGdkWindow());
+      gdk_wayland_surface_get_wl_surface(GetToplevelSurface());
   if (!surface) {
     /* Can be null when the window is hidden.
      * Though it's unlikely that a lock request comes in that case, be
@@ -9597,7 +9611,7 @@ bool nsWindow::SetEGLNativeWindowSize(
 }
 #endif
 
-nsWindow* nsWindow::GetWindow(GdkWindow* window) {
+nsWindow* nsWindow::GetWindow(GdkSurface* window) {
   return get_window_for_gdk_window(window);
 }
 
@@ -9622,9 +9636,9 @@ void nsWindow::OnMap() {
     EnsureGdkWindow();
     RefreshScale(/* aRefreshScreen */ false);
 
-    if (mIsAlert) {
-      gdk_window_set_override_redirect(GetToplevelGdkWindow(), TRUE);
-    }
+    //if (mIsAlert) {
+    //  gdk_window_set_override_redirect(GetToplevelSurface(), TRUE);
+    //}
 
 #ifdef MOZ_X11
     if (GdkIsX11Display()) {
@@ -9667,7 +9681,7 @@ void nsWindow::OnMap() {
     if (mNoAutoHide) {
       gint wmd = ConvertBorderStyles(mBorderStyle);
       if (wmd != -1) {
-        gdk_window_set_decorations(mGdkWindow, (GdkWMDecoration)wmd);
+        //gdk_window_set_decorations(mGdkWindow, (GdkWMDecoration)wmd);
       }
     }
     // If the popup ignores mouse events, set an empty input shape.
@@ -9690,7 +9704,7 @@ void nsWindow::OnUnmap() {
   {
     MutexAutoLock lock(mWindowVisibilityMutex);
     mIsMapped = false;
-
+    /*
     if (mSourceDragContext) {
       static auto sGtkDragCancel =
           (void (*)(GdkDragContext*))dlsym(RTLD_DEFAULT, "gtk_drag_cancel");
@@ -9699,7 +9713,7 @@ void nsWindow::OnUnmap() {
         mSourceDragContext = nullptr;
       }
     }
-
+    */
     if (mGdkWindow) {
       g_object_set_data(G_OBJECT(mGdkWindow), "nsWindow", nullptr);
       mGdkWindow = nullptr;
@@ -9770,20 +9784,21 @@ void nsWindow::OnUnmap() {
 //
 bool nsWindow::ApplyEnterLeaveMutterWorkaround() {
   // Leave (toplevel) case
-  if (mWindowType == WindowType::TopLevel && mWaylandPopupNext &&
+  /*if (mWindowType == WindowType::TopLevel && mWaylandPopupNext &&
       mWaylandPopupNext->mWaylandPopupNext &&
       gtk_window_get_type_hint(GTK_WINDOW(mWaylandPopupNext->GetGtkWidget())) ==
           GDK_WINDOW_TYPE_HINT_UTILITY) {
     LOG("nsWindow::ApplyEnterLeaveMutterWorkaround(): leave toplevel");
     return true;
   }
-  // Leave (popup) case
+   Leave (popup) case
   if (IsWaylandPopup() && mWaylandPopupNext &&
-      gtk_window_get_type_hint(GTK_WINDOW(mShell)) ==
-          GDK_WINDOW_TYPE_HINT_UTILITY) {
+      //gtk_window_get_type_hint(GTK_WINDOW(mShell)) ==
+      //    GDK_WINDOW_TYPE_HINT_UTILITY) {
     LOG("nsWindow::ApplyEnterLeaveMutterWorkaround(): leave popup");
     return true;
   }
+  */
   return false;
 }
 
@@ -9803,7 +9818,7 @@ void nsWindow::NotifyOcclusionState(OcclusionState aState) {
     mWidgetListener->OcclusionStateChanged(mIsFullyOccluded);
   }
 }
-
+/*
 void nsWindow::SetDragSource(GdkDragContext* aSourceDragContext) {
   mSourceDragContext = aSourceDragContext;
   if (IsPopup() &&
@@ -9813,7 +9828,7 @@ void nsWindow::SetDragSource(GdkDragContext* aSourceDragContext) {
     }
   }
 }
-
+*/
 UniquePtr<WaylandSurfaceLock> nsWindow::LockSurface() {
 #ifdef MOZ_WAYLAND
   if (mIsDestroyed || !mSurface) {
