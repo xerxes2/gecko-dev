@@ -841,6 +841,23 @@ nsresult nsLookAndFeel::PerThemeData::GetColor(ColorID aID,
       aColor = GetStandinForNativeColor(
           aID, mIsDark ? ColorScheme::Dark : ColorScheme::Light);
       break;
+    case ColorID::Canvastext:
+      aColor = mWindow.mFg;
+      break;
+    case ColorID::Canvas:
+      aColor = mWindow.mBg;
+      break;
+    case ColorID::MozMenubarhovertext:
+      aColor = mMenuHover.mBg;
+      break;
+    case ColorID::MozMacDefaultbuttontext: 
+      aColor = mWindow.mFg;
+      break;
+     case ColorID::TextSelectAttentionBackground:
+     case ColorID::TextSelectDisabledBackground:
+     case ColorID::TextHighlightBackground:
+      aColor = mInfo.mBg;
+      break;
     default:
       /* default color is BLACK */
       aColor = 0;
@@ -980,8 +997,7 @@ nsresult nsLookAndFeel::NativeGetInt(IntID aID, int32_t& aResult) {
       aResult = sCSDAvailable;
       break;
     case IntID::GTKCSDTransparencyAvailable: {
-      GdkDisplay* display = gdk_display_get_default();
-      aResult = gdk_display_is_composited(display);
+      aResult = ScreenHelperGTK::IsComposited();
       break;
     }
     case IntID::GTKCSDMaximizeButton:
@@ -1240,9 +1256,9 @@ void nsLookAndFeel::ClearRoundedCornerProvider() {
   if (!mRoundedCornerProvider) {
     return;
   }
-  gtk_style_context_remove_provider_for_display(
-      gdk_display_get_default(),
-      GTK_STYLE_PROVIDER(mRoundedCornerProvider.get()));
+  //gtk_style_context_remove_provider_for_display(
+  //    gdk_display_get_default(),
+  //    GTK_STYLE_PROVIDER(mRoundedCornerProvider.get()));
   mRoundedCornerProvider = nullptr;
 }
 
@@ -1263,12 +1279,14 @@ void nsLookAndFeel::UpdateRoundedBottomCornerStyles() {
       "}\n",
       radius, radius);
   //GUniquePtr<GError> error;
+  /*
   gtk_css_provider_load_from_data(mRoundedCornerProvider.get(),
                                        string.get(), string.Length());
   gtk_style_context_add_provider_for_display(
       gdk_display_get_default(),
       GTK_STYLE_PROVIDER(mRoundedCornerProvider.get()),
       GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
+  */
 }
 
 Maybe<ColorScheme> nsLookAndFeel::ComputeColorSchemeSetting() {
@@ -1404,11 +1422,13 @@ void nsLookAndFeel::ConfigureFinalEffectiveTheme() {
         break;
     };
     // Check xdg-portal.
+    /*
     if (*mDBusSettings.mColorScheme == ColorScheme::Dark) {
       return true;
     } else if (*mDBusSettings.mColorScheme == ColorScheme::Light) {
       return false;
     }
+    */
     // Last resort is to check gtksettings.
     return GetPreferDarkTheme();
   }();
@@ -1417,65 +1437,23 @@ void nsLookAndFeel::ConfigureFinalEffectiveTheme() {
   UpdateRoundedBottomCornerStyles();
   //moz_gtk_refresh();
 }
-
+/*
 using ColorPair = nsLookAndFeel::ColorPair;
-static ColorPair GetColorPair(GdkRGBA colFg, GdkRGBA colBg) {
+static ColorPair GetColorPair(GdkRGBA* colFg, GdkRGBA* colBg) {
   ColorPair result;
-  result.mFg = GDK_RGBA_TO_NS_RGBA(colFg);
-  result.mBg = GDK_RGBA_TO_NS_RGBA(colBg);
+  result.mFg = GDK_RGBA_TO_NS_RGBA(*colFg);
+  result.mBg = GDK_RGBA_TO_NS_RGBA(*colBg);
   return result;
 }
+*/
 
-struct ThemeProto {
-  const char* pBase;
-  const char* pText;
-  const char* pBg;
-  const char* pFg;
-  const char* pFgSel;
-  const char* pBgSel;
-  const char* pBord;
-  const char* pBordSel;
-  const char* pBordEdge;
-  const char* pBordAlt;
-  const char* pLink;
-  const char* pLinkVis;
-  const char* pHbBg;
-  const char* pMenu;
-  const char* pMenuSel;
-  const char* pScrollBg;
-  const char* pScrollSl;
-  const char* pScrollSlHo;
-  const char* pScrollSlAc;
-  const char* pWarn;
-  const char* pErr;
-  const char* pSucc;
-  const char* pDest;
-  const char* pDarkFill;
-  const char* pSideBg;
-  const char* pShadow;
-  const char* pBgIns;
-  const char* pFgIns;
-  const char* pBordIns;
-  const char* pBaseBack;
-  const char* pTextBack;
-  const char* pBgBack;
-  const char* pFgBack;
-  const char* pBackIns;
-  const char* pFgBackIns;
-  const char* pFgBackSel;
-  const char* pBordBack;
-  const char* pDarkFillBack;
-  const char* pDrop;
-  const char* pTooltBord;
-};
-
-struct ThemeProto ThemeDefault = {
+struct nsLookAndFeel::ThemeProto ThemeDefault = {
   THEME_DEFAULT_BASE,
   THEME_DEFAULT_TEXT,
   THEME_DEFAULT_BG,
   THEME_DEFAULT_FG,
-  THEME_DEFAULT_FG_SEL,
   THEME_DEFAULT_BG_SEL,
+  THEME_DEFAULT_FG_SEL,
   THEME_DEFAULT_BORD,
   THEME_DEFAULT_BORD_SEL,
   THEME_DEFAULT_BORD_EDGE,
@@ -1505,19 +1483,23 @@ struct ThemeProto ThemeDefault = {
   THEME_DEFAULT_FG_BACK,
   THEME_DEFAULT_BACK_INS,
   THEME_DEFAULT_FG_BACK_SEL,
+  THEME_DEFAULT_SCROLL_BG_BACK,
+  THEME_DEFAULT_SCROLL_SL_BACK,
   THEME_DEFAULT_BORD_BACK,
   THEME_DEFAULT_DARK_FILL_BACK,
   THEME_DEFAULT_DROP,
+  THEME_DEFAULT_TOOLT_BG,
+  THEME_DEFAULT_TOOLT_FG,
   THEME_DEFAULT_TOOLT_BORD
 };
 
-struct ThemeProto ThemeDefaultDark = {
+struct nsLookAndFeel::ThemeProto ThemeDefaultDark = {
   THEME_DEFAULT_DARK_BASE,
   THEME_DEFAULT_DARK_TEXT,
   THEME_DEFAULT_DARK_BG,
   THEME_DEFAULT_DARK_FG,
-  THEME_DEFAULT_DARK_FG_SEL,
   THEME_DEFAULT_DARK_BG_SEL,
+  THEME_DEFAULT_DARK_FG_SEL,
   THEME_DEFAULT_DARK_BORD,
   THEME_DEFAULT_DARK_BORD_SEL,
   THEME_DEFAULT_DARK_BORD_EDGE,
@@ -1547,9 +1529,13 @@ struct ThemeProto ThemeDefaultDark = {
   THEME_DEFAULT_DARK_FG_BACK,
   THEME_DEFAULT_DARK_BACK_INS,
   THEME_DEFAULT_DARK_FG_BACK_SEL,
+  THEME_DEFAULT_DARK_SCROLL_BG_BACK,
+  THEME_DEFAULT_DARK_SCROLL_SL_BACK,
   THEME_DEFAULT_DARK_BORD_BACK,
   THEME_DEFAULT_DARK_DARK_FILL_BACK,
   THEME_DEFAULT_DARK_DROP,
+  THEME_DEFAULT_DARK_TOOLT_BG,
+  THEME_DEFAULT_DARK_TOOLT_FG,
   THEME_DEFAULT_DARK_TOOLT_BORD
 };
 
@@ -1560,137 +1546,99 @@ void nsLookAndFeel::PerThemeData::Init(const char* themeName, bool isDark) {
   mName = themeName;
   mIsDark = isDark;
 
-  struct ThemeProto *theme;
-
-  if (strcmp(themeName, "Default") == 0) {
-    theme = &ThemeDefault;
+  if (strcmp(themeName, "Default-dark") == 0) {
+    mTheme = &ThemeDefaultDark;
   } else {
-    theme = &ThemeDefaultDark;
+    mTheme = &ThemeDefault;
   }
 
-  GdkRGBA col0;
-  GdkRGBA col1;
+  // Window
+  mWindow.mFg = mTheme->pFg;
+  mWindow.mBg = mTheme->pBg;
+  mDialog = mWindow;
+  mMozWindowActiveBorder = mTheme->pBord;
+  mMozWindowInactiveBorder = mTheme->pBordBack;
 
-  gdk_rgba_parse(&col0, theme->pScrollBg);
-  mThemedScrollbar = GDK_RGBA_TO_NS_RGBA(col0);
-  gdk_rgba_parse(&col0, theme->pScrollBg);
-  mThemedScrollbarInactive = GDK_RGBA_TO_NS_RGBA(col0);
-  mThemedScrollbarInactive =
-      NS_ComposeColors(mThemedScrollbarInactive, GDK_RGBA_TO_NS_RGBA(col0));
-  gdk_rgba_parse(&col0, theme->pScrollBg);
-  mThemedScrollbarThumb = GDK_RGBA_TO_NS_RGBA(col0);
-  gdk_rgba_parse(&col0, theme->pScrollBg);
-  mThemedScrollbarThumbHover = GDK_RGBA_TO_NS_RGBA(col0);
-  gdk_rgba_parse(&col0, theme->pScrollBg);
-  mThemedScrollbarThumbActive = GDK_RGBA_TO_NS_RGBA(col0);
-  gdk_rgba_parse(&col0, theme->pScrollBg);
-  mThemedScrollbarThumbInactive = GDK_RGBA_TO_NS_RGBA(col0);
-
-  // Window colors
-  gdk_rgba_parse(&col0, theme->pBordBack);
-  gdk_rgba_parse(&col1, theme->pBordBack);
-  mWindow = mDialog = GetColorPair(col0, col1);
-  gdk_rgba_parse(&col0, theme->pBord);
-  mMozWindowActiveBorder = GDK_RGBA_TO_NS_RGBA(col0);
-  gdk_rgba_parse(&col0, theme->pBordBack);
-  mMozWindowInactiveBorder = GDK_RGBA_TO_NS_RGBA(col0);
-
-  // tooltip foreground and background
-  gdk_rgba_parse(&col0, theme->pBordBack);
-  mInfo.mFg = GDK_RGBA_TO_NS_RGBA(col0);
-  gdk_rgba_parse(&col0, theme->pBordBack);
-  mInfo.mBg = GDK_RGBA_TO_NS_RGBA(col0);
-
-  gdk_rgba_parse(&col0, theme->pBordBack);
-  mMenu.mFg = GDK_RGBA_TO_NS_RGBA(col0);
-  gdk_rgba_parse(&col0, theme->pBordBack);
-  mGrayText = GDK_RGBA_TO_NS_RGBA(col0);
-
-  gdk_rgba_parse(&col0, theme->pBordBack);
-  gdk_rgba_parse(&col1, theme->pBordBack);
-  mTitlebar = GetColorPair(col0, col1);
-  gdk_rgba_parse(&col0, theme->pBordBack);
-  mTitlebarInactive = GetColorPair(col0, col1);
+  // Titlebar
+  mTitlebar.mFg = mTheme->pText;
+  mTitlebar.mBg =  mTheme->pBg;
+  mTitlebarInactive.mFg = mTheme->pFgBack;
+  mTitlebarInactive.mBg = mTheme->pBgBack;
   //mTitlebarRadius = IsSolidCSDStyleUsed() ? 0 : GetBorderRadius(style);
   //mTitlebarButtonSpacing = moz_gtk_get_titlebar_button_spacing();
-
   mHeaderBar = mTitlebar;
   mHeaderBarInactive = mTitlebarInactive;
-  gdk_rgba_parse(&col0, theme->pBordBack);
-  mHeaderBar.mFg = GDK_RGBA_TO_NS_RGBA(col0);
-  gdk_rgba_parse(&col0, theme->pBordBack);
-  mHeaderBarInactive.mFg = GDK_RGBA_TO_NS_RGBA(col0);
-  mHeaderBar.mBg = mHeaderBar.mFg;
-  mHeaderBarInactive.mBg = mHeaderBar.mFg;
 
-  mMenu.mBg = GDK_RGBA_TO_NS_RGBA(col0);
-  mMenu.mFg = GDK_RGBA_TO_NS_RGBA(col0);
-  mWindow.mBg = GDK_RGBA_TO_NS_RGBA(col0);
-  mMenuHover.mFg = GDK_RGBA_TO_NS_RGBA(col0);
+  // Scrollbar
+  mThemedScrollbar = mTheme->pScrollBg;
+  mThemedScrollbarInactive = mTheme->pScrollBgBack;
+  mThemedScrollbarInactive =
+      NS_ComposeColors(mThemedScrollbarInactive, mTheme->pScrollBg);
+  mThemedScrollbarThumb = mTheme->pScrollSl;
+  mThemedScrollbarThumbHover = mTheme->pScrollSlHo;
+  mThemedScrollbarThumbActive = mTheme->pScrollSlAc;
+  mThemedScrollbarThumbInactive = mTheme->pScrollSlBack;
+
+  // Tooltip
+  mInfo.mFg = mTheme->pTooltFg;
+  mInfo.mBg = mTheme->pTooltBg;
+
+  // Menu
+  mMenu.mBg = mTheme->pMenu;
+  mMenu.mFg = mTheme->pFg;
+  mMenuHover.mFg = mTheme->pFg;
   mMenuHover.mBg = NS_ComposeColors(mMenu.mBg, mMenu.mFg);
+  mMenuHover.mBg = mTheme->pBg;
 
-  // Text colors
-  gdk_rgba_parse(&col0, theme->pBordBack);
-  ApplyColorOver(col0, &col1);
-  mField.mBg = GDK_RGBA_TO_NS_RGBA(col1);
-  gdk_rgba_parse(&col0, theme->pBordBack);
-  mField.mFg = GDK_RGBA_TO_NS_RGBA(col0);
+  // Text
+  //ApplyColorOver(col0, &col1);
+  mField.mBg = mTheme->pBg;
+  mField.mFg = mTheme->pText;
   mSidebar = mField;
+  mSidebarBorder = mTheme->pFgBack;
+  mGrayText = NS_RGB(120, 120, 120);
+  mThreeDShadow = mGrayText;
+  mThreeDHighlight = mGrayText;
 
   // Selected text and background
-  gdk_rgba_parse(&col0, theme->pBordBack);
-  mSelectedText.mBg = GDK_RGBA_TO_NS_RGBA(col0);
-  gdk_rgba_parse(&col0, theme->pBordBack);
-  mSelectedText.mFg = GDK_RGBA_TO_NS_RGBA(col0);
-  mSelectedText.mBg = mSelectedText.mFg;
-
+  mSelectedText.mBg = mTheme->pBgSel;
+  mSelectedText.mFg = mTheme->pFgSel;
   mSelectedItem = mSelectedText;
-  mAccent = mSelectedItem;
+  mCellHighlight.mBg = mTheme->pBgSel;
+  mCellHighlight.mFg = mTheme->pBgSel;
+  mAccent.mBg = mSelectedItem.mBg;
+  mAccent.mFg = mSelectedItem.mFg;
+  mOddCellBackground = mTheme->pBg;
   //EnsureColorPairIsOpaque(mAccent);
   //PreferDarkerBackground(mAccent);
 
-  // Button text color
-  gdk_rgba_parse(&col0, theme->pBordBack);
-  mButtonBorder = GDK_RGBA_TO_NS_RGBA(col0);
-  mButton = GetColorPair(col0, col1);
-  mButtonHover = GetColorPair(col0, col1);
-  mButtonActive = GetColorPair(col0, col1);
-  if (!NS_GET_A(mButtonHover.mBg)) {
-    mButtonHover.mBg = mWindow.mBg;
-  }
-  if (!NS_GET_A(mButtonActive.mBg)) {
-    mButtonActive.mBg = mWindow.mBg;
-  }
+  // Button
+  mButtonBorder = mTheme->pBordBack;
+  mButton.mFg = mTheme->pText;
+  mButton.mBg = mTheme->pBg;
+  mButtonHover.mFg = mTheme->pText;
+  mButtonHover.mBg = mTheme->pBg;
+  mButtonActive.mFg = mTheme->pText;
+  mButtonActive.mBg = mTheme->pBg;
 
-  // Combobox text color
-  gdk_rgba_parse(&col0, theme->pBordBack);
-  mComboBoxText = GDK_RGBA_TO_NS_RGBA(col0);
+  // Combobox
+  mComboBoxText = mTheme->pText;
 
-  // Get odd row background color
-  gdk_rgba_parse(&col0, theme->pBordBack);
-  mOddCellBackground = GDK_RGBA_TO_NS_RGBA(col0);
-
-  // Column header colors
-  gdk_rgba_parse(&col0, theme->pBordBack);
-  gdk_rgba_parse(&col1, theme->pBordBack);
-  mMozColHeader = GetColorPair(col0, col1);
-  mMozColHeaderHover = GetColorPair(col0, col1);
-  mMozColHeaderActive = GetColorPair(col0, col1);
-
-  // Compute cell highlight colors
-  //InitCellHighlightColors();
-
-  mSidebarBorder = mThreeDShadow;
+  // Column header
+  mMozColHeader.mFg = mTheme->pFg;
+  mMozColHeader.mBg = mTheme->pBg;
+  mMozColHeaderHover.mFg = mTheme->pFg;
+  mMozColHeaderHover.mBg = mTheme->pBg;
+  mMozColHeaderActive.mFg = mTheme->pFg;
+  mMozColHeaderActive.mBg = mTheme->pBg;
 
   // Some themes have a unified menu bar, and support window dragging on it
   gboolean supports_menubar_drag = FALSE;
   mMenuSupportsDrag = supports_menubar_drag;
 
-  // Limks
-  gdk_rgba_parse(&col0, theme->pBordBack);
-  mNativeHyperLinkText = GDK_RGBA_TO_NS_RGBA(col0);
-  gdk_rgba_parse(&col0, theme->pBordBack);
-  mNativeVisitedHyperLinkText = GDK_RGBA_TO_NS_RGBA(col0);
+  // Links
+  mNativeHyperLinkText = mTheme->pLink;
+  mNativeVisitedHyperLinkText = mTheme->pLinkVis;
 
   // invisible character styles
   guint value = 42;
@@ -1707,9 +1655,6 @@ void nsLookAndFeel::PerThemeData::Init(const char* themeName, bool isDark) {
     }
     LOGLNF(" * titlebar-radius: %d\n", mTitlebarRadius);
   }
-
-  gdk_rgba_free(&col0);
-  gdk_rgba_free(&col1);
 }
 
 // virtual
