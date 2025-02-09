@@ -13,85 +13,93 @@
 #include "nsCOMPtr.h"
 #include "gfxFont.h"
 
-#define THEME_DEFAULT_BASE "#ffffff"
-#define THEME_DEFAULT_TEXT "#000000"
-#define THEME_DEFAULT_BG "#f6f5f4"
-#define THEME_DEFAULT_FG "#2e3436"
-#define THEME_DEFAULT_FG_SEL "#ffffff"
-#define THEME_DEFAULT_BG_SEL "#3584e4"
-#define THEME_DEFAULT_BORD "darken($bg_color, 18%)"
-#define THEME_DEFAULT_BORD_SEL "darken($selected_bg_color, 15%)"
-#define THEME_DEFAULT_BORD_EDGE "transparentize(white, 0.2)"
-#define THEME_DEFAULT_BORD_ALT "darken($bg_color, 24%)"
-#define THEME_DEFAULT_LINK "darken($selected_bg_color, 10%)"
-#define THEME_DEFAULT_LINK_VIS "darken($selected_bg_color, 20%)"
-#define THEME_DEFAULT_HB_BG "lighten($bg_color, 5%)"
+#define THEME_DEFAULT_BASE NS_RGBA(255, 255, 255, 255)
+#define THEME_DEFAULT_TEXT NS_RGBA(0, 0, 0, 255)
+#define THEME_DEFAULT_BG NS_RGBA(246, 245, 244, 255)
+#define THEME_DEFAULT_FG NS_RGBA(46, 52, 54, 255)
+#define THEME_DEFAULT_BG_SEL NS_RGBA(53, 132, 228, 255)
+#define THEME_DEFAULT_FG_SEL NS_RGBA(255, 255, 255, 255)
+#define THEME_DEFAULT_BORD NS_RGBA(205, 199, 194, 255)
+#define THEME_DEFAULT_BORD_SEL NS_RGBA(24, 95, 180, 255)
+#define THEME_DEFAULT_BORD_EDGE NS_RGBA(255, 255, 255, 204)
+#define THEME_DEFAULT_BORD_ALT NS_RGBA(191, 184, 177, 255)
+#define THEME_DEFAULT_LINK NS_RGBA(27, 106, 203, 255)
+#define THEME_DEFAULT_LINK_VIS NS_RGBA(21, 83, 158, 255)
+#define THEME_DEFAULT_HB_BG NS_RGBA(255, 255, 255, 255)
 #define THEME_DEFAULT_MENU THEME_DEFAULT_BASE
-#define THEME_DEFAULT_MENU_SEL "darken($bg_color, 6%)"
-#define THEME_DEFAULT_SCROLL_BG "mix($bg_color, $fg_color, 80%)"
-#define THEME_DEFAULT_SCROLL_SL "mix($fg_color, $bg_color, 60%)"
-#define THEME_DEFAULT_SCROLL_SL_HO "mix($fg_color, $bg_color, 80%)"
-#define THEME_DEFAULT_SCROLL_SL_AC "darken($selected_bg_color, 10%)"
-#define THEME_DEFAULT_WARN "#f57900"
-#define THEME_DEFAULT_ERR "#cc0000"
-#define THEME_DEFAULT_SUCC "#33d17a"
-#define THEME_DEFAULT_DEST "#e01b24"
-#define THEME_DEFAULT_DARK_FILL "mix($borders_color, $bg_color, 50%)"
-#define THEME_DEFAULT_SIDE_BG "mix($bg_color, $base_color, 50%)"
-#define THEME_DEFAULT_SHADOW "transparentize(black, 0.9)"
-#define THEME_DEFAULT_BG_INS "mix($bg_color, $base_color, 60%)"
-#define THEME_DEFAULT_FG_INS "mix($fg_color, $bg_color, 50%)"
-#define THEME_DEFAULT_BORD_INS "mix($borders_color, $bg_color, 80%)"
-#define THEME_DEFAULT_BASE_BACK "darken($base_color, 1%)"
-#define THEME_DEFAULT_TEXT_BACK "mix($text_color, $backdrop_base_color, 80%)"
+#define THEME_DEFAULT_MENU_SEL NS_RGBA(232, 230, 227, 255)
+#define THEME_DEFAULT_SCROLL_BG NS_RGBA(206, 206, 206, 255)
+#define THEME_DEFAULT_SCROLL_SL NS_RGBA(126, 129, 130, 255)
+#define THEME_DEFAULT_SCROLL_SL_HO NS_RGBA(86, 91, 92, 255)
+#define THEME_DEFAULT_SCROLL_SL_AC NS_RGBA(27, 106, 203, 255)
+#define THEME_DEFAULT_WARN NS_RGBA(245, 121, 0, 255)
+#define THEME_DEFAULT_ERR NS_RGBA(204, 0, 0, 255)
+#define THEME_DEFAULT_SUCC NS_RGBA(51, 209, 122, 255)
+#define THEME_DEFAULT_DEST NS_RGBA(224, 27, 36, 255)
+#define THEME_DEFAULT_DARK_FILL NS_RGBA(226, 223, 220, 255)
+#define THEME_DEFAULT_SIDE_BG NS_RGBA(251, 250, 250, 255)
+#define THEME_DEFAULT_SHADOW NS_RGBA(0, 0, 0, 25)
+#define THEME_DEFAULT_BG_INS NS_RGBA(250, 249, 248, 255)
+#define THEME_DEFAULT_FG_INS NS_RGBA(146, 149, 149, 255)
+#define THEME_DEFAULT_BORD_INS NS_RGBA(214, 210, 205, 255)
+#define THEME_DEFAULT_BASE_BACK NS_RGBA(252, 252, 252, 255)
+#define THEME_DEFAULT_TEXT_BACK NS_RGBA(50, 50, 50, 255)
 #define THEME_DEFAULT_BG_BACK THEME_DEFAULT_BG
-#define THEME_DEFAULT_FG_BACK "mix($fg_color, $backdrop_bg_color, 50%)"
-#define THEME_DEFAULT_BACK_INS "darken($backdrop_bg_color, 15%)"
-#define THEME_DEFAULT_FG_BACK_SEL "$backdrop_base_color"
-#define THEME_DEFAULT_BORD_BACK "mix($borders_color, $bg_color, 80%)"
-#define THEME_DEFAULT_DARK_FILL_BACK "mix($backdrop_borders_color, $backdrop_bg_color, 35%)"
-#define THEME_DEFAULT_DROP "#2ec27e"
-#define THEME_DEFAULT_TOOLT_BORD "transparentize(white, 0.9)"
+#define THEME_DEFAULT_FG_BACK NS_RGBA(146, 149, 149, 255)
+#define THEME_DEFAULT_BACK_INS NS_RGBA(212, 207, 202, 255)
+#define THEME_DEFAULT_FG_BACK_SEL THEME_DEFAULT_BASE_BACK
+#define THEME_DEFAULT_SCROLL_BG_BACK NS_RGBA(239, 237, 236, 255)
+#define THEME_DEFAULT_SCROLL_SL_BACK NS_RGBA(146, 146, 145, 255)
+#define THEME_DEFAULT_BORD_BACK NS_RGBA(214, 210, 205, 255)
+#define THEME_DEFAULT_DARK_FILL_BACK NS_RGBA(235, 233, 230, 255)
+#define THEME_DEFAULT_DROP NS_RGBA(46, 194, 126, 255)
+#define THEME_DEFAULT_TOOLT_BG NS_RGBA(20, 20, 20, 255)
+#define THEME_DEFAULT_TOOLT_FG NS_RGBA(255, 255, 255, 255)
+#define THEME_DEFAULT_TOOLT_BORD NS_RGBA(255, 255, 255, 25)
 
-#define THEME_DEFAULT_DARK_BASE "lighten(desaturate(#241f31, 100%), 2%)"
-#define THEME_DEFAULT_DARK_TEXT "#ffffff"
-#define THEME_DEFAULT_DARK_BG "darken(desaturate(#3d3846, 100%), 4%)"
-#define THEME_DEFAULT_DARK_FG "#eeeeec"
-#define THEME_DEFAULT_DARK_FG_SEL "#ffffff"
-#define THEME_DEFAULT_DARK_BG_SEL "darken(#3584e4, 20%)"
-#define THEME_DEFAULT_DARK_BORD "darken($bg_color, 10%)"
-#define THEME_DEFAULT_DARK_BORD_SEL "darken($selected_bg_color, 30%))"
-#define THEME_DEFAULT_DARK_BORD_EDGE "transparentize($fg_color, 0.93))"
-#define THEME_DEFAULT_DARK_BORD_ALT "darken($bg_color, 18%)"
-#define THEME_DEFAULT_DARK_LINK "lighten($selected_bg_color, 20%)"
-#define THEME_DEFAULT_DARK_LINK_VIS "lighten($selected_bg_color, 10%)"
-#define THEME_DEFAULT_DARK_HB_BG "darken($bg_color, 3%))"
+#define THEME_DEFAULT_DARK_BASE NS_RGBA(45, 45, 45, 255)
+#define THEME_DEFAULT_DARK_TEXT NS_RGBA(255, 255, 255, 255)
+#define THEME_DEFAULT_DARK_BG NS_RGBA(53, 53, 53, 255)
+#define THEME_DEFAULT_DARK_FG NS_RGBA(238, 238, 236, 255)
+#define THEME_DEFAULT_DARK_BG_SEL NS_RGBA(21, 83, 158, 255)
+#define THEME_DEFAULT_DARK_FG_SEL NS_RGBA(255, 255, 255, 255)
+#define THEME_DEFAULT_DARK_BORD NS_RGBA(28, 28, 28, 255)
+#define THEME_DEFAULT_DARK_BORD_SEL NS_RGBA(3, 12, 23, 255)
+#define THEME_DEFAULT_DARK_BORD_EDGE NS_RGBA(238, 238, 236, 18)
+#define THEME_DEFAULT_DARK_BORD_ALT NS_RGBA(7, 7, 7, 255)
+#define THEME_DEFAULT_DARK_LINK NS_RGBA(53, 132, 228, 255)
+#define THEME_DEFAULT_DARK_LINK_VIS NS_RGBA(27, 107, 203, 255)
+#define THEME_DEFAULT_DARK_HB_BG NS_RGBA(45, 45, 45, 255)
 #define THEME_DEFAULT_DARK_MENU THEME_DEFAULT_DARK_BASE
-#define THEME_DEFAULT_DARK_MENU_SEL "darken($bg_color, 8%)"
-#define THEME_DEFAULT_DARK_SCROLL_BG "mix($base_color, $bg_color, 50%))"
-#define THEME_DEFAULT_DARK_SCROLL_SL "mix($fg_color, $bg_color, 60%)"
-#define THEME_DEFAULT_DARK_SCROLL_SL_HO "mix($fg_color, $bg_color, 80%)"
-#define THEME_DEFAULT_DARK_SCROLL_SL_AC "lighten($selected_bg_color, 10%)"
-#define THEME_DEFAULT_DARK_WARN "#f57900"
-#define THEME_DEFAULT_DARK_ERR "#cc0000"
-#define THEME_DEFAULT_DARK_SUCC "darken(#33d17a, 10%)"
-#define THEME_DEFAULT_DARK_DEST "darken(#e01b24, 10%)"
-#define THEME_DEFAULT_DARK_DARK_FILL "mix($borders_color, $bg_color, 50%)"
-#define THEME_DEFAULT_DARK_SIDE_BG "mix($bg_color, $base_color, 50%)"
-#define THEME_DEFAULT_DARK_SHADOW "transparentize(black, 0.9)"
-#define THEME_DEFAULT_DARK_BG_INS "mix($bg_color, $base_color, 60%)"
-#define THEME_DEFAULT_DARK_FG_INS "mix($fg_color, $bg_color, 50%)"
-#define THEME_DEFAULT_DARK_BORD_INS "mix($borders_color, $bg_color, 80%)"
-#define THEME_DEFAULT_DARK_BASE_BACK "lighten($base_color, 1%)"
-#define THEME_DEFAULT_DARK_TEXT_BACK "mix($text_color, $backdrop_base_color, 80%)"
+#define THEME_DEFAULT_DARK_MENU_SEL NS_RGBA(33, 33, 33, 255)
+#define THEME_DEFAULT_DARK_SCROLL_BG NS_RGBA(49, 49, 49, 255)
+#define THEME_DEFAULT_DARK_SCROLL_SL NS_RGBA(164, 164, 163, 255)
+#define THEME_DEFAULT_DARK_SCROLL_SL_HO NS_RGBA(201, 201, 199, 255)
+#define THEME_DEFAULT_DARK_SCROLL_SL_AC NS_RGBA(27, 107, 203, 255)
+#define THEME_DEFAULT_DARK_WARN NS_RGBA(245, 121, 0, 255)
+#define THEME_DEFAULT_DARK_ERR NS_RGBA(204, 0, 0, 255)
+#define THEME_DEFAULT_DARK_SUCC NS_RGBA(38, 171, 98, 255)
+#define THEME_DEFAULT_DARK_DEST NS_RGBA(178, 22, 29, 255)
+#define THEME_DEFAULT_DARK_DARK_FILL NS_RGBA(41, 41, 41, 255)
+#define THEME_DEFAULT_DARK_SIDE_BG NS_RGBA(49, 49, 49, 255)
+#define THEME_DEFAULT_DARK_SHADOW NS_RGBA(0, 0, 0, 26)
+#define THEME_DEFAULT_DARK_BG_INS NS_RGBA(50, 50, 50, 255)
+#define THEME_DEFAULT_DARK_FG_INS NS_RGBA(146, 146, 145, 255)
+#define THEME_DEFAULT_DARK_BORD_INS NS_RGBA(33, 33, 3, 255)
+#define THEME_DEFAULT_DARK_BASE_BACK NS_RGBA(48, 48, 48, 255)
+#define THEME_DEFAULT_DARK_TEXT_BACK NS_RGBA(214, 214, 214, 255)
 #define THEME_DEFAULT_DARK_BG_BACK THEME_DEFAULT_DARK_BG
-#define THEME_DEFAULT_DARK_FG_BACK "mix($fg_color, $backdrop_bg_color, 50%)"
-#define THEME_DEFAULT_DARK_BACK_INS "lighten($backdrop_bg_color, 15%))"
-#define THEME_DEFAULT_DARK_FG_BACK_SEL "$backdrop_text_color"
-#define THEME_DEFAULT_DARK_BORD_BACK "mix($borders_color, $bg_color, 80%)"
-#define THEME_DEFAULT_DARK_DARK_FILL_BACK "mix($backdrop_borders_color, $backdrop_bg_color, 35%)"
-#define THEME_DEFAULT_DARK_DROP "#26a269"
-#define THEME_DEFAULT_DARK_TOOLT_BORD "transparentize(white, 0.9)"
+#define THEME_DEFAULT_DARK_FG_BACK NS_RGBA(146, 146, 145, 255)
+#define THEME_DEFAULT_DARK_BACK_INS NS_RGBA(91, 91, 91, 255)
+#define THEME_DEFAULT_DARK_FG_BACK_SEL THEME_DEFAULT_DARK_TEXT_BACK
+#define THEME_DEFAULT_DARK_SCROLL_BG_BACK NS_RGBA(45, 45, 45, 255)
+#define THEME_DEFAULT_DARK_SCROLL_SL_BACK NS_RGBA(53, 53, 53, 255)
+#define THEME_DEFAULT_DARK_BORD_BACK NS_RGBA(33, 33, 33, 255)
+#define THEME_DEFAULT_DARK_DARK_FILL_BACK NS_RGBA(46, 46, 46, 255)
+#define THEME_DEFAULT_DARK_DROP NS_RGBA(38, 162, 105, 255)
+#define THEME_DEFAULT_DARK_TOOLT_BG NS_RGBA(20, 20, 20, 255)
+#define THEME_DEFAULT_DARK_TOOLT_FG NS_RGBA(255, 255, 255, 255)
+#define THEME_DEFAULT_DARK_TOOLT_BORD NS_RGBA(255, 255, 255, 26)
 
 enum WidgetNodeType : int;
 struct _GtkStyle;
@@ -148,6 +156,51 @@ class nsLookAndFeel final : public nsXPLookAndFeel {
       return !(*this == aOther);
     }
   };
+  struct ThemeProto {
+    nscolor pBase;
+    nscolor pText;
+    nscolor pBg;
+    nscolor pFg;
+    nscolor pBgSel;
+    nscolor pFgSel;
+    nscolor pBord;
+    nscolor pBordSel;
+    nscolor pBordEdge;
+    nscolor pBordAlt;
+    nscolor pLink;
+    nscolor pLinkVis;
+    nscolor pHbBg;
+    nscolor pMenu;
+    nscolor pMenuSel;
+    nscolor pScrollBg;
+    nscolor pScrollSl;
+    nscolor pScrollSlHo;
+    nscolor pScrollSlAc;
+    nscolor pWarn;
+    nscolor pErr;
+    nscolor pSucc;
+    nscolor pDest;
+    nscolor pDarkFill;
+    nscolor pSideBg;
+    nscolor pShadow;
+    nscolor pBgIns;
+    nscolor pFgIns;
+    nscolor pBordIns;
+    nscolor pBaseBack;
+    nscolor pTextBack;
+    nscolor pBgBack;
+    nscolor pFgBack;
+    nscolor pBackIns;
+    nscolor pFgBackSel;
+    nscolor pScrollBgBack;
+    nscolor pScrollSlBack;
+    nscolor pBordBack;
+    nscolor pDarkFillBack;
+    nscolor pDrop;
+    nscolor pTooltBg;
+    nscolor pTooltFg;
+    nscolor pTooltBord;
+  };
 
   using ThemeFamily = mozilla::StyleGtkThemeFamily;
 
@@ -167,6 +220,7 @@ class nsLookAndFeel final : public nsXPLookAndFeel {
     bool mIsDark = false;
     bool mHighContrast = false;
     bool mPreferDarkTheme = false;
+    ThemeProto* mTheme;
 
     ThemeFamily mFamily{0};
 
