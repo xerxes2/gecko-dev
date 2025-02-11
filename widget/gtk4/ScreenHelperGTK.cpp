@@ -67,8 +67,7 @@ class ScreenGetterGtk final {
 static GdkMonitor* GdkDisplayGetMonitor(GdkDisplay* aDisplay, int aMonitorNum) {
   //static auto s_gdk_display_get_monitor = (GdkMonitor * (*)(GdkDisplay*, int))
   //    dlsym(RTLD_DEFAULT, "gdk_display_get_monitor");
-  GdkDisplay* display = gdk_display_get_default();
-  GListModel* monitors = gdk_display_get_monitors(display);
+  GListModel* monitors = gdk_display_get_monitors(aDisplay);
   void* monitor = g_list_model_get_item(monitors, aMonitorNum);
   if (!monitor) {
     return nullptr;
@@ -88,16 +87,16 @@ RefPtr<Screen> ScreenHelperGTK::GetScreenForWindow(nsWindow* aWindow) {
     return nullptr;
   }
 
-  GdkSurface* gdkWindow = aWindow->GetToplevelSurface();
-  if (!gdkWindow) {
-    LOG_SCREEN("  failed, can't get GdkWindow");
+  GdkSurface* gdkSurface = aWindow->GetToplevelSurface();
+  if (!gdkSurface) {
+    LOG_SCREEN("  failed, can't get GdkSurface");
     return nullptr;
   }
 
   GdkDisplay* display = gdk_display_get_default();
-  GdkMonitor* monitor = s_gdk_display_get_monitor_at_window(display, gdkWindow);
+  GdkMonitor* monitor = s_gdk_display_get_monitor_at_window(display, gdkSurface);
   if (!monitor) {
-    LOG_SCREEN("  failed, can't get monitor for GdkWindow");
+    LOG_SCREEN("  failed, can't get monitor for GdkSurface");
     return nullptr;
   }
 
@@ -188,26 +187,27 @@ void ScreenGetterGtk::Init() {
 ScreenGetterGtk::~ScreenGetterGtk() {
   if (mRootWindow) {
     //g_signal_handlers_disconnect_by_data(gdk_screen_get_default(), this);
-
     //gdk_window_remove_filter(mRootWindow, root_window_event_filter, this);
     g_object_unref(mRootWindow);
     mRootWindow = nullptr;
   }
 }
 
-static uint32_t GetGTKPixelDepth() {
-  uint32_t depth = 32;
-  return depth;
+static uint32_t GetGTKPixelDepth(GdkDisplay* aDisplay) {
+  if (gdk_display_is_rgba(aDisplay)) {
+    return 32;
+  }
+  return 16;
 }
 
 static already_AddRefed<Screen> MakeScreenGtk(GdkDisplay* aDisplay,
                                               gint aMonitorNum) {
   gint gdkScaleFactor = ScreenHelperGTK::GetGTKMonitorScaleFactor(aMonitorNum);
-
   // gdk_screen_get_monitor_geometry / workarea returns application pixels
   // (desktop pixels), so we need to convert it to device pixels with
   // gdkScaleFactor.
   gint geometryScaleFactor = gdkScaleFactor;
+  GdkMonitor* aMonitor = GdkDisplayGetMonitor(aDisplay, aMonitorNum);
 
   gint refreshRate = [&] {
     // Since gtk 3.22
@@ -217,18 +217,14 @@ static already_AddRefed<Screen> MakeScreenGtk(GdkDisplay* aDisplay,
     if (!s_gdk_monitor_get_refresh_rate) {
       return 0;
     }
-    GdkMonitor* monitor =
-        GdkDisplayGetMonitor(gdk_display_get_default(), aMonitorNum);
-    if (!monitor) {
+    if (!aMonitor) {
       return 0;
     }
     // Convert to Hz.
-    return NSToIntRound(s_gdk_monitor_get_refresh_rate(monitor) / 1000.0f);
+    return NSToIntRound(s_gdk_monitor_get_refresh_rate(aMonitor) / 1000.0f);
   }();
 
   GdkRectangle workarea;
-  GdkDisplay* display = gdk_display_get_default();
-  GdkMonitor* aMonitor = GdkDisplayGetMonitor(display, aMonitorNum);
   gdk_monitor_get_geometry(aMonitor, &workarea);
   LayoutDeviceIntRect availRect(workarea.x * geometryScaleFactor,
                                 workarea.y * geometryScaleFactor,
@@ -252,7 +248,7 @@ static already_AddRefed<Screen> MakeScreenGtk(GdkDisplay* aDisplay,
     contentsScale.scale = gdkScaleFactor;
   }
 
-  uint32_t pixelDepth = GetGTKPixelDepth();
+  uint32_t pixelDepth = GetGTKPixelDepth(aDisplay);
   if (pixelDepth == 32) {
     // If a device uses 32 bits per pixel, it's still only using 8 bits
     // per color component, which is what our callers want to know.
@@ -288,22 +284,19 @@ static already_AddRefed<Screen> MakeScreenGtk(GdkDisplay* aDisplay,
 void ScreenGetterGtk::RefreshScreens() {
   LOG_SCREEN("ScreenGetterGtk::RefreshScreens()");
   AutoTArray<RefPtr<Screen>, 4> screenList;
-
-  GdkDisplay* defaultDisplay = gdk_display_get_default();
   gint n_monitors = ScreenHelperGTK::GetMonitorCount();
   LOG_SCREEN("GDK reports %d monitors", n_monitors);
+  GdkDisplay* defaultDisplay = gdk_display_get_default();
 
   for (gint i = 0; i < n_monitors; i++) {
     screenList.AppendElement(MakeScreenGtk(defaultDisplay, i));
   }
-
   ScreenManager::Refresh(std::move(screenList));
 }
 
 gint ScreenHelperGTK::GetGTKMonitorScaleFactor(gint aMonitorNum) {
   MOZ_ASSERT(NS_IsMainThread());
-  GdkDisplay* display = gdk_display_get_default();
-  GdkMonitor* monitor = GdkDisplayGetMonitor(display, aMonitorNum);
+  GdkMonitor* monitor = GdkDisplayGetMonitor(gdk_display_get_default(), aMonitorNum);
   return aMonitorNum < GetMonitorCount()
              ? gdk_monitor_get_scale_factor(monitor)
              : 1;
@@ -315,8 +308,7 @@ ScreenHelperGTK::ScreenHelperGTK() {
 }
 
 int ScreenHelperGTK::GetMonitorCount() {
-  GdkDisplay* display = gdk_display_get_default();
-  GListModel* monitors = gdk_display_get_monitors(display);
+  GListModel* monitors = gdk_display_get_monitors(gdk_display_get_default());
   guint n_monitors = g_list_model_get_n_items(monitors);
   return n_monitors;
 }
