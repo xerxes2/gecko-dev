@@ -31,7 +31,7 @@ else:
 OS_LIBS += [f for f in CONFIG["MOZ_GTK3_LIBS"] if f.startswith("-L")]
 OS_LIBS += no_as_needed
 OS_LIBS += [
-    "gtk-3",
-    "gdk-3",
+    "gtk-4",
+    #"gdk-4",
 ]
 OS_LIBS += as_needed
