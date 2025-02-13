@@ -313,7 +313,7 @@ nsLookAndFeel::nsLookAndFeel() {
       // Affects ScrollToClick
       "notify::gtk-primary-button-warps-slider"_ns,
       // Affects SubmenuDelay
-      "notify::gtk-menu-popup-delay"_ns,
+      //"notify::gtk-menu-popup-delay"_ns,
       // Affects DragThresholdX/Y
       "notify::gtk-dnd-drag-threshold"_ns,
       // Affects titlebar actions loaded at moz_gtk_refresh().
@@ -534,8 +534,7 @@ void nsLookAndFeel::NativeInit() { EnsureInit(); }
 
 void nsLookAndFeel::RefreshImpl() {
   mInitialized = false;
-  //moz_gtk_refresh();
-
+  
   nsXPLookAndFeel::RefreshImpl();
 }
 
@@ -927,15 +926,14 @@ nsresult nsLookAndFeel::NativeGetInt(IntID aID, int32_t& aResult) {
       else
         aResult = 0;
     } break;
-    case IntID::SubmenuDelay: {
-      GtkSettings* settings;
-      gint delay;
-
-      settings = gtk_settings_get_default();
-      g_object_get(settings, "gtk-menu-popup-delay", &delay, nullptr);
-      aResult = (int32_t)delay;
-      break;
-    }
+    //case IntID::SubmenuDelay: {
+    //  GtkSettings* settings;
+    //  gint delay;
+    //  settings = gtk_settings_get_default();
+    //  g_object_get(settings, "gtk-menu-popup-delay", &delay, nullptr);
+    //  aResult = (int32_t)delay;
+    //  break;
+    //}
     case IntID::MenusCanOverlapOSBar:
       aResult = 0;
       break;
