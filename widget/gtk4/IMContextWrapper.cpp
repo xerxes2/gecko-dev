@@ -421,16 +421,14 @@ nsDependentCSubstring IMContextWrapper::GetIMName() const {
 }
 
 void IMContextWrapper::Init() {
-  MozContainer* container = mOwnerWindow->GetMozContainer();
+  GtkWidget* container = mOwnerWindow->GetGtkWidget();
   MOZ_ASSERT(container, "container is null");
-  //GdkSurface* gdkWindow = gtk_widget_get_window(GTK_WIDGET(container));
-  GtkNative* native = gtk_widget_get_native(GTK_WIDGET(container));
-  GdkSurface* gdkWindow = gtk_native_get_surface(native);
+  GdkSurface* gdkSurface = mOwnerWindow->GetToplevelSurface();
 
   // Overwrite selection colors of the window before associating the window
   // with IM context since IME may look up selection colors via IM context
   // to support any colored widgets.
-  SelectionStyleProvider::GetInstance()->AttachTo(gdkWindow);
+  SelectionStyleProvider::GetInstance()->AttachTo(gdkSurface);
 
   // NOTE: gtk_im_*_new() abort (kill) the whole process when it fails.
   //       So, we don't need to check the result.
