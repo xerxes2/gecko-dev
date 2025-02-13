@@ -54,35 +54,21 @@ int32_t WidgetUtilsGTK::IsTouchDeviceSupportPresent() {
   if (!display) {
     return 0;
   }
-  /* GdkDeviceManager* manager = gdk_display_get_device_manager(display);
-  
-  GList* devices =
-     gdk_device_manager_list_devices(manager, GDK_DEVICE_TYPE_SLAVE);
-  GList* list = devices;
-
-  while (devices) {
-    GdkDevice* device = static_cast<GdkDevice*>(devices->data);
-    if (gdk_device_get_source(device) == GDK_SOURCE_TOUCHSCREEN) {
-      result = 1;
-      break;
-    }
-    devices = devices->next;
-  }
-
-  if (list) {
-    g_list_free(list);
-  } */
   GdkSeat* seat = gdk_display_get_default_seat(display);
   if (!seat) {
     return 0;
   }
-  GdkSeatCapabilities seatCaps = gdk_seat_get_capabilities(seat);
-  GFlagsValue* value = g_flags_get_first_value(G_FLAGS_CLASS(&seatCaps), GDK_SEAT_CAPABILITY_TOUCH);
-  if (value) {
+  /*
+  GList* devices = gdk_seat_get_devices(seat, GdkSeatCapabilities(GDK_SEAT_CAPABILITY_TOUCH));
+  if (g_list_length(devices)) {
     result = 1;
-    g_type_class_unref(value);
   }
-  g_object_unref(&seatCaps);
+  g_list_free(devices);
+  */
+  GdkSeatCapabilities seatCaps = gdk_seat_get_capabilities(seat);
+  if (seatCaps & GDK_SEAT_CAPABILITY_TOUCH) {
+    result = 1;
+  }
   return result;
 }
 
