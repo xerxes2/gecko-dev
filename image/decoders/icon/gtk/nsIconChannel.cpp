@@ -376,10 +376,12 @@ nsresult nsIconChannel::GetIcon(nsIURI* aURI, ByteBuf* aDataOut) {
     stockIcon.get(), NULL, iconSize, scaleFactor, direction,
     GTK_ICON_LOOKUP_FORCE_SYMBOLIC);
   GFile* gFile = gtk_icon_paintable_get_file(iconPaint);
-  char* path;
+  char* path = nullptr;
   if (gFile) {
     path = g_file_get_path(gFile);
-    iconExists = true;
+    if (path) {
+      iconExists = true;
+    }
   }
   #else
   GtkIconLookupFlags iconFlags;
