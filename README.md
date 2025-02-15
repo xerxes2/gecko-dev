@@ -20,9 +20,25 @@ official Mozilla GTK3 port.
 
 All contributions very much welcome.
 
+## Roadmap
+1. Make it build (done)
+2. Get it to start (80%)
+3. Make the upstart sequence work properly (60%)
+4. Fix input events
+    * Keyboard (20%)
+    * Pointer (20%)
+    * Touch (20%)
+5. Implement missing features
+    * Clipboard (0%)
+    * Drag-and-drop (0%)
+    * Filepicker (0%)
+    * Appchooser (0%)
+    * Colorpicker (0%)
+    * Emojipicker (0%)
+
 ## Discussion
 Ticket at Mozilla: https://bugzilla.mozilla.org/show_bug.cgi?id=1701123
 
 ## Help
-GTK porting doc: https://docs.gtk.org/gtk4/migrating-3to4.html
+GTK4 porting doc: https://docs.gtk.org/gtk4/migrating-3to4.html
 
