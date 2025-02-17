@@ -25,7 +25,7 @@
  *
  *   - It provides GdkWindow to draw content.
  */
-
+/*
 #define MOZ_CONTAINER_TYPE (moz_container_get_type())
 #define MOZ_CONTAINER(obj) \
   (G_TYPE_CHECK_INSTANCE_CAST((obj), MOZ_CONTAINER_TYPE, MozContainer))
@@ -37,16 +37,18 @@
   (G_TYPE_CHECK_CLASS_TYPE((klass), MOZ_CONTAINER_TYPE))
 #define MOZ_CONTAINER_GET_CLASS(obj) \
   (G_TYPE_INSTANCE_GET_CLASS((obj), MOZ_CONTAINER_TYPE, MozContainerClass))
+*/
+#define MOZ_CONTAINER(obj) (obj)
 #ifdef MOZ_WAYLAND
-#  define MOZ_WL_CONTAINER(obj) (MOZ_CONTAINER(obj)->wl)
-#  define MOZ_WL_SURFACE(obj) (MOZ_CONTAINER(obj)->wl->mSurface)
+#  define MOZ_WL_CONTAINER(obj) (obj->wl)
+#  define MOZ_WL_SURFACE(obj) (obj->wl->mSurface)
 #endif
 
 typedef struct _MozContainer MozContainer;
 typedef struct _MozContainerClass MozContainerClass;
 
 struct _MozContainer {
-  GtkBox container;
+  GtkWidget* widget;
   gboolean destroyed;
 #ifdef MOZ_WAYLAND
   MozContainerWayland* wl;
@@ -54,7 +56,7 @@ struct _MozContainer {
 };
 
 struct _MozContainerClass {
-  GtkBoxClass parent_class;
+  GtkWidgetClass parent_class;
 };
 
 namespace mozilla::widget {
@@ -62,9 +64,12 @@ class WaylandSurface;
 }
 
 GType moz_container_get_type(void);
-GtkWidget* moz_container_new(void* aWindow,
+MozContainer* moz_container_new(void* aWindow, GtkWidget* aWidget,
                              mozilla::widget::WaylandSurface* aSurface);
-void moz_container_unmap(GtkWidget* widget);
+void moz_container_map(MozContainer* container);
+void moz_container_unmap(MozContainer* container);
+void moz_container_destroy(MozContainer* container);
+//void moz_container_size_allocate(GdkSurface* aSurface, gint width, gint height, MozContainer* container);
 void moz_container_class_init(MozContainerClass* klass);
 
 class nsWindow;
