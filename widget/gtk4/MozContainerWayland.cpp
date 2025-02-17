@@ -108,7 +108,16 @@ static void moz_container_wayland_invalidate(MozContainer* container) {
 // We need to skip painting in such case do avoid Wayland compositor freaking.
 bool moz_container_wayland_egl_window_set_size(MozContainer* container,
                                                nsIntSize aScaledSize) {
+  
+  if (!moz_container_wayland_has_egl_window(container)) {
+    wl_egl_window* eglWindow = moz_container_wayland_get_egl_window(container);
+    return false;
+  }
+  printf("moz_container_wayland_egl_window_set_size width: %d, height: %d\n", aScaledSize.width, aScaledSize.height);
   return MOZ_WL_SURFACE(container)->SetEGLWindowSize(aScaledSize);
+  //WaylandSurface* surface = MOZ_WL_SURFACE(container);
+  //WaylandSurfaceLock lock(surface);
+
 }
 
 void moz_container_wayland_add_or_fire_initial_draw_callback(
@@ -116,16 +125,16 @@ void moz_container_wayland_add_or_fire_initial_draw_callback(
   MOZ_WL_SURFACE(container)->AddOrFireReadyToDrawCallback(initial_draw_cb);
 }
 
-void moz_container_wayland_unmap(GtkWidget* widget) {
-  g_return_if_fail(IS_MOZ_CONTAINER(widget));
+void moz_container_wayland_unmap(MozContainer* container) {
+  //g_return_if_fail(IS_MOZ_CONTAINER(widget));
 
   // Unmap MozContainer first so we can remove our resources
-  moz_container_unmap(widget);
+  //moz_container_unmap(widget);
 
-  LOGCONTAINER("%s [%p]\n", __FUNCTION__,
-               (void*)moz_container_get_nsWindow(MOZ_CONTAINER(widget)));
+  //LOGCONTAINER("%s [%p]\n", __FUNCTION__,
+  //             (void*)moz_container_get_nsWindow(MOZ_CONTAINER(widget)));
 
-  WaylandSurface* surface = MOZ_WL_SURFACE(MOZ_CONTAINER(widget));
+  WaylandSurface* surface = MOZ_WL_SURFACE(container);
   // MozContainer map/unmap is processed on main thread only
   // so we don't need to lock WaylandSurface here.
   if (surface->IsMapped()) {
@@ -138,7 +147,7 @@ void moz_container_wayland_unmap(GtkWidget* widget) {
   }
   surface->UnmapLocked(lock);
 }
-
+/*
 gboolean moz_container_wayland_map_event(GtkWidget* widget,
                                          GdkEvent* event) {
   LOGCONTAINER("%s [%p]\n", __FUNCTION__,
@@ -179,36 +188,32 @@ gboolean moz_container_wayland_map_event(GtkWidget* widget,
 
   return moz_container_wayland_ensure_surface(container);
 }
-
-void moz_container_wayland_size_allocate(GtkWidget* widget,
-                                         int width,
-                                         int height,
-                                         int baseline) {
-  GtkAllocation tmp_allocation;
-
-  g_return_if_fail(IS_MOZ_CONTAINER(widget));
-
-  LOGCONTAINER("moz_container_wayland_size_allocate [%p] %d x %d\n",
-               (void*)moz_container_get_nsWindow(MOZ_CONTAINER(widget)),
-               width, height);
-
+*/
+void moz_container_wayland_size_allocate(MozContainer* container) {
+  //GtkAllocation tmp_allocation;
+  //g_return_if_fail(IS_MOZ_CONTAINER(widget));
+  //LOGCONTAINER("moz_container_wayland_size_allocate [%p] %d x %d\n",
+  //             (void*)moz_container_get_nsWindow(MOZ_CONTAINER(widget)),
+  //             width, height);
+  //printf("Widget width: %d height: %d\n", gtk_widget_get_width(container->widget),
+  //  gtk_widget_get_height(container->widget));
   /* short circuit if you can */
-  gtk_widget_get_allocation(widget, &tmp_allocation);
-  if (tmp_allocation.width == width && tmp_allocation.height == height) {
-    return;
-  }
+  //gtk_widget_get_allocation(widget, &tmp_allocation);
+  //if (tmp_allocation.width == width && tmp_allocation.height == height) {
+    //return;
+  //}
   //gtk_widget_set_allocation(widget, allocation);
 
-  if (gtk_widget_get_realized(widget)) {
+  //if (gtk_widget_get_realized(widget)) {
     //gdk_window_move_resize(gtk_widget_get_window(widget), tmp_allocation->width,
     //                       tmp_allocation->height);
     // We need to position our subsurface according to GdkWindow
     // when offset changes (GdkWindow is maximized for instance).
     // see gtk-clutter-embed.c for reference.
-    gfx::IntPoint position(tmp_allocation.x, tmp_allocation.y);
-    moz_container_wayland_ensure_surface(MOZ_CONTAINER(widget), &position);
-    MOZ_WL_CONTAINER(widget)->before_first_size_alloc = false;
-  }
+  //}
+  gfx::IntPoint position(0, 0);  
+  moz_container_wayland_ensure_surface(container, &position);
+  MOZ_WL_CONTAINER(container)->before_first_size_alloc = false;
 }
 
 static bool moz_container_wayland_ensure_surface(MozContainer* container,
@@ -220,16 +225,14 @@ static bool moz_container_wayland_ensure_surface(MozContainer* container,
   if (surface->IsMapped()) {
     if (aPosition) {
       surface->MoveLocked(lock, *aPosition);
+    //moz_container_wayland_invalidate(container);
     }
-    moz_container_wayland_invalidate(container);
     return true;
   }
 
-  LOGWAYLAND("%s [%p]\n", __FUNCTION__,
-             (void*)moz_container_get_nsWindow(container));
-  
-  GdkSurface* gdkSurface = gtk_native_get_surface(gtk_widget_get_native(GTK_WIDGET(container)));
-  //GdkSurface* window;
+  //LOGWAYLAND("%s [%p]\n", __FUNCTION__,
+  //           (void*)moz_container_get_nsWindow(container));
+  GdkSurface* gdkSurface = gtk_native_get_surface(gtk_widget_get_native(container->widget));
   MOZ_DIAGNOSTIC_ASSERT(gdkSurface);
 
   wl_surface* parentSurface = gdk_wayland_surface_get_wl_surface(gdkSurface);
@@ -261,6 +264,7 @@ static bool moz_container_wayland_ensure_surface(MozContainer* container,
   nsWindow* window = moz_container_get_nsWindow(container);
   MOZ_RELEASE_ASSERT(window);
 
+  /*
   GtkWindow* parent =
       gtk_window_get_transient_for(GTK_WINDOW(window->GetGtkWidget()));
   if (parent) {
@@ -270,7 +274,7 @@ static bool moz_container_wayland_ensure_surface(MozContainer* container,
     surface->SetParentLocked(lock,
                              MOZ_WL_SURFACE(parentWindow->GetMozContainer()));
   }
-
+  */
   bool fractionalScale = false;
   if (StaticPrefs::widget_wayland_fractional_scale_enabled_AtStartup()) {
     fractionalScale = surface->EnableFractionalScaleLocked(
@@ -294,6 +298,7 @@ static bool moz_container_wayland_ensure_surface(MozContainer* container,
   // Commit eplicitly now as moz_container_wayland_invalidate() initiated
   // widget repaint
   surface->CommitLocked(lock);
+  //surface->CreateViewportLocked(lock, true);
 
   moz_container_wayland_invalidate(container);
   return true;
@@ -305,16 +310,17 @@ struct wl_egl_window* moz_container_wayland_get_egl_window(
                (void*)moz_container_get_nsWindow(container),
                MOZ_WL_SURFACE(container)->IsMapped(),
                MOZ_WL_SURFACE(container)->HasEGLWindow());
-
+printf("moz_container_wayland_get_egl_window\n");
   if (!MOZ_WL_SURFACE(container)->IsMapped()) {
     return nullptr;
   }
 
   // TODO: Get size from bounds instead of GdkWindow?
   // We may be in rendering/compositor thread here.
-  GdkSurface* window = gtk_native_get_surface(gtk_widget_get_native(GTK_WIDGET(container)));
+  GdkSurface* window = gtk_native_get_surface(gtk_widget_get_native(container->widget));
   nsIntSize unscaledSize(gdk_surface_get_width(window),
                          gdk_surface_get_height(window));
+  
   return MOZ_WL_SURFACE(container)->GetEGLWindow(unscaledSize);
 }
 
@@ -342,6 +348,7 @@ gboolean moz_container_wayland_can_draw(MozContainer* container) {
 
 double moz_container_wayland_get_scale(MozContainer* container) {
   nsWindow* window = moz_container_get_nsWindow(container);
+  //nsWindow* window = container->nsWindow;
   return window ? window->FractionalScaleFactor() : 1.0;
 }
 
