@@ -1154,14 +1154,13 @@ NS_IMETHODIMP_(bool)
 nsNativeThemeGTK::ThemeSupportsWidget(nsPresContext* aPresContext,
                                       nsIFrame* aFrame,
                                       StyleAppearance aAppearance) {
-  return false;
   if (IsWidgetTypeDisabled(mDisabledWidgetTypes, aAppearance)) {
     return false;
   }
-
   if (IsWidgetAlwaysNonNative(aFrame, aAppearance)) {
     return Theme::ThemeSupportsWidget(aPresContext, aFrame, aAppearance);
   }
+  return false;
 
   switch (aAppearance) {
     // Combobox dropdowns don't support native theming in vertical mode.
