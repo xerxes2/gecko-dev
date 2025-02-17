@@ -537,7 +537,7 @@ class nsWindow final : public nsBaseWidget {
   GtkWidget* GetToplevelWidget() const;
   nsWindow* GetContainerWindow() const;
   Window GetX11Window();
-  void EnsureGdkWindow();
+  void EnsureGdkSurface();
   void SetUrgencyHint(GtkWidget* top_window, bool state);
   void SetDefaultIcon(void);
   void SetWindowDecoration(BorderStyle aStyle);
@@ -579,8 +579,9 @@ class nsWindow final : public nsBaseWidget {
   void RefreshWindowClass();
 
   GtkWidget* mShell = nullptr;
-  MozContainer* mContainer = nullptr;
+  GdkSurface* mShellSurface = nullptr;
   GdkSurface* mGdkWindow = nullptr;
+  MozContainer* mContainer = nullptr;
 #ifdef MOZ_WAYLAND
   RefPtr<mozilla::widget::WaylandSurface> mSurface;
 #endif
