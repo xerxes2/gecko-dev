@@ -208,7 +208,7 @@
   @media (-moz-bool-pref: "widget.gtk.non-native-titlebar-buttons.enabled") {
     /* When using lightweight themes, use our own buttons since native ones might
      * assume a native background in order to be visible. */
-    :root[lwtheme] & {
+    /* :root[lwtheme] & { */
       padding-inline: 3px;
 
       > .toolbarbutton-icon {
@@ -222,7 +222,7 @@
         width: 24px;
         height: 24px;
       }
-    }
+    /* } */
   }
 
   &:hover > .toolbarbutton-icon {
