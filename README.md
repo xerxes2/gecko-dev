@@ -12,6 +12,10 @@ $ cp mozconfig.proto mozconfig
 $ ./mach configure
 $ ./mach build
 ```
+And start it with:
+```
+$ ./mach run
+```
 
 ## Coding
 This port is using the widget/gtk4 directory exclusively and outside of it you must use "#ifdef MOZ_GTK4".
@@ -22,8 +26,8 @@ All contributions very much welcome.
 
 ## Roadmap
 1. Make it build (done)
-2. Get it to start (80%)
-3. Make the upstart sequence work properly (60%)
+2. Get it to start (done)
+3. Make the upstart/shutdown sequences work properly (60%)
 4. Fix input events
     * Keyboard (20%)
     * Pointer (20%)
