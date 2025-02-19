@@ -2086,9 +2086,9 @@ bool KeymapWrapper::IsBasicLatinLetterOrNumeral(uint32_t aCharCode) {
 guint KeymapWrapper::GetGDKKeyvalWithoutModifier(GdkEvent* aGdkKeyEvent) {
   //KeymapWrapper* keymapWrapper = GetInstance();
   guint keyval;
-  GdkModifierType* modifiers = nullptr;
-  if (!gdk_key_event_get_match(GDK_EVENT(aGdkKeyEvent), &keyval, modifiers)) {
-    return 0;
+  GdkModifierType modifiers;
+  if (!gdk_key_event_get_match(GDK_EVENT(aGdkKeyEvent), &keyval, &modifiers)) {
+    keyval = 0;
   }
   return keyval;
 }
