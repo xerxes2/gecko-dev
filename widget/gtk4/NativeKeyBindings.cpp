@@ -171,7 +171,7 @@ static const Command sMoveCommands[][2][2] = {
 
 static void move_cursor_cb(GtkWidget* w, GtkMovementStep step, gint count,
                            gboolean extend_selection, gpointer user_data) {
-  g_signal_stop_emission_by_name(w, "move_cursor");
+  g_signal_stop_emission_by_name(w, "move-cursor");
   if (count == 0) {
     // Nothing to do.
     return;
@@ -197,7 +197,7 @@ static void move_cursor_cb(GtkWidget* w, GtkMovementStep step, gint count,
 
 static void paste_clipboard_cb(GtkWidget* w, gpointer user_data) {
   AddCommand(Command::Paste);
-  g_signal_stop_emission_by_name(w, "paste_clipboard");
+  g_signal_stop_emission_by_name(w, "paste-clipboard");
   gHandled = true;
 }
 
@@ -210,7 +210,7 @@ static void select_all_cb(GtkWidget* aWidget, gboolean aSelect,
   if (aSelect) {
     AddCommand(Command::SelectAll);
   }
-  g_signal_stop_emission_by_name(aWidget, "select_all");
+  g_signal_stop_emission_by_name(aWidget, "select-all");
   // Although we prevent the default of `GtkTExtView` with
   // `g_signal_stop_emission_by_name`, but `gHandled` is used for asserting
   // if it does not match with the emptiness of the command array.
@@ -254,27 +254,26 @@ void NativeKeyBindings::Shutdown() {
 
 void NativeKeyBindings::Init(NativeKeyBindingsType aType) {
   switch (aType) {
-    case NativeKeyBindingsType::SingleLineEditor:
-      mNativeTarget = gtk_entry_new();
-      break;
+    //case NativeKeyBindingsType::SingleLineEditor:
+    //  mNativeTarget = gtk_entry_new();
+    //  break;
     default:
       mNativeTarget = gtk_text_view_new();
-      g_signal_connect(mNativeTarget, "select_all", G_CALLBACK(select_all_cb),
+      g_signal_connect(mNativeTarget, "select-all", G_CALLBACK(select_all_cb),
                        this);
       break;
   }
-
   g_object_ref_sink(mNativeTarget);
 
-  g_signal_connect(mNativeTarget, "copy_clipboard",
+  g_signal_connect(mNativeTarget, "copy-clipboard",
                    G_CALLBACK(copy_clipboard_cb), this);
-  g_signal_connect(mNativeTarget, "cut_clipboard", G_CALLBACK(cut_clipboard_cb),
+  g_signal_connect(mNativeTarget, "cut-clipboard", G_CALLBACK(cut_clipboard_cb),
                    this);
-  g_signal_connect(mNativeTarget, "delete_from_cursor",
+  g_signal_connect(mNativeTarget, "delete-from-cursor",
                    G_CALLBACK(delete_from_cursor_cb), this);
-  g_signal_connect(mNativeTarget, "move_cursor", G_CALLBACK(move_cursor_cb),
+  g_signal_connect(mNativeTarget, "move-cursor", G_CALLBACK(move_cursor_cb),
                    this);
-  g_signal_connect(mNativeTarget, "paste_clipboard",
+  g_signal_connect(mNativeTarget, "paste-clipboard",
                    G_CALLBACK(paste_clipboard_cb), this);
 }
 
@@ -377,15 +376,26 @@ bool NativeKeyBindings::GetEditCommandsInternal(
     guint aKeyval) {
   //guint modifiers = static_cast<GdkEventKey*>(aEvent.mNativeKeyEvent)->state;
   guint modifiers = gdk_event_get_modifier_state(GDK_EVENT(static_cast<GdkKeyEvent*>(aEvent.mNativeKeyEvent)));
-  guint keycode = gdk_key_event_get_keycode(GDK_EVENT(static_cast<GdkKeyEvent*>(aEvent.mNativeKeyEvent)));
+  guint keyval = gdk_key_event_get_keyval(GDK_EVENT(static_cast<GdkKeyEvent*>(aEvent.mNativeKeyEvent)));
 
   gCurrentCommands = &aCommands;
-
+  nsAutoCString aSignal;
   gHandled = false;
   //gtk_bindings_activate(G_OBJECT(mNativeTarget), aKeyval,
   //  GdkModifierType(modifiers));
-  g_signal_emit_by_name(G_OBJECT(mNativeTarget), "key-pressed", aKeyval, keycode, GdkModifierType(modifiers));
 
+  switch (keyval) {
+    case 99:
+      GdkKeyMatch match = gdk_key_event_matches(GDK_EVENT(static_cast<GdkKeyEvent*>(aEvent.mNativeKeyEvent)),
+                                                          keyval, GdkModifierType(GDK_CONTROL_MASK));
+      if (match == GDK_KEY_MATCH_EXACT) {
+        aSignal = "copy-clipboard";
+      }
+      break;
+  }
+  if (aSignal.Length() > 1) {
+    g_signal_emit_by_name(G_OBJECT(mNativeTarget), aSignal.get());
+  }
   gCurrentCommands = nullptr;
 
   return gHandled;
