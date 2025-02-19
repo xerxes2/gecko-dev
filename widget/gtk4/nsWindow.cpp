@@ -686,6 +686,7 @@ void nsWindow::Destroy() {
   gtk_window_destroy(GTK_WINDOW(mShell));
   moz_container_destroy(mContainer);
   mShell = nullptr;
+  mGdkWindow = nullptr;
   mContainer = nullptr;
 #ifdef MOZ_WAYLAND
   mSurface = nullptr;
@@ -1289,8 +1290,8 @@ void nsWindow::HideWaylandToplevelWindow() {
     }
   }
   WaylandStopVsync();
-  gtk_widget_set_visible(mShell, false);
   moz_container_unmap(mContainer);
+  gtk_widget_set_visible(mShell, false);
 }
 
 void nsWindow::ShowWaylandToplevelWindow() {
@@ -4604,10 +4605,10 @@ void nsWindow::OnButtonPressEvent(GdkEvent* aGdkEvent) {
   //  }
   //}
 
-  nsWindow* containerWindow = GetContainerWindow();
-  if (!gFocusWindow && containerWindow) {
-    containerWindow->DispatchActivateEvent();
-  }
+  //nsWindow* containerWindow = GetContainerWindow();
+  //if (!gFocusWindow && containerWindow) {
+  //  containerWindow->DispatchActivateEvent();
+  //}
 
   const auto refPoint = GetRefPoint(this, aGdkEvent);
   /*
