@@ -452,9 +452,9 @@ nsWindow::nsWindow()
     // so we need to init our clipboard hooks before we create window
     // and get focus.
     if (GdkIsWaylandDisplay()) {
-      //nsCOMPtr<nsIClipboard> clipboard =
-      //    do_GetService("@mozilla.org/widget/clipboard;1");
-      //NS_ASSERTION(clipboard, "Failed to init clipboard!");
+      nsCOMPtr<nsIClipboard> clipboard =
+          do_GetService("@mozilla.org/widget/clipboard;1");
+      NS_ASSERTION(clipboard, "Failed to init clipboard!");
     }
 #endif
   }
@@ -5190,6 +5190,7 @@ void nsWindow::DispatchPanGesture(PanGestureInput& aPanInput) {
 
   ProcessUntransformedAPZEvent(&event, result);
 }
+
 /*
 void nsWindow::OnVisibilityNotifyEvent(GdkVisibilityState aState) {
   LOG("nsWindow::OnVisibilityNotifyEvent [%p] state 0x%x\n", this, aState);
