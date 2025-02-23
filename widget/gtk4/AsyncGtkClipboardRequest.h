@@ -27,8 +27,8 @@ class MOZ_STACK_CLASS AsyncGtkClipboardRequest {
 
   UniquePtr<Request> mRequest;
 
-  static void OnDataReceived(GtkClipboard*, GtkSelectionData*, gpointer);
-  static void OnTextReceived(GtkClipboard*, const gchar*, gpointer);
+  static void OnDataReceived(GObject*, GAsyncResult*, gpointer);
+  static void OnTextReceived(GObject*, GAsyncResult*, gpointer);
 
  public:
   // Launch a request for a particular GTK clipboard. The current status of the
