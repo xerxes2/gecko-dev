@@ -70,17 +70,17 @@ MOZ_CONSTINIT ClipboardTargets nsRetrievalContext::sClipboardTargets;
 MOZ_CONSTINIT ClipboardTargets nsRetrievalContext::sPrimaryTargets;
 
 // Callback when someone asks us for the data
-static void clipboard_get_cb(GtkClipboard* aGtkClipboard,
-                             GtkSelectionData* aSelectionData, guint info,
+static void clipboard_get_cb(GdkClipboard* aGdkClipboard,
+                             GdkContentProvider** aContentProvider, guint info,
                              gpointer user_data);
 
 // Callback when someone asks us to clear a clipboard
-static void clipboard_clear_cb(GtkClipboard* aGtkClipboard, gpointer user_data);
+static void clipboard_clear_cb(GdkClipboard* aGdkClipboard, gpointer user_data);
 
 // Callback when owner of clipboard data is changed
-static void clipboard_owner_change_cb(GtkClipboard* aGtkClipboard,
-                                      GdkEventOwnerChange* aEvent,
-                                      gpointer aUserData);
+//static void clipboard_owner_change_cb(GdkClipboard* aGdkClipboard,
+//                                      GdkEventOwnerChange* aEvent,
+//                                      gpointer aUserData);
 
 static bool GetHTMLCharset(Span<const char> aData, nsCString& str);
 
@@ -100,9 +100,9 @@ ClipboardTargets ClipboardTargets::Clone() {
   ClipboardTargets ret;
   ret.mCount = mCount;
   if (mCount) {
-    ret.mTargets.reset(
-        reinterpret_cast<GdkAtom*>(g_malloc(sizeof(GdkAtom) * mCount)));
-    memcpy(ret.mTargets.get(), mTargets.get(), sizeof(GdkAtom) * mCount);
+   // ret.mTargets.reset(
+   //     reinterpret_cast<GdkAtom*>(g_malloc(sizeof(GdkAtom) * mCount)));
+   // memcpy(ret.mTargets.get(), mTargets.get(), sizeof(GdkAtom) * mCount);
   }
   return ret;
 }
@@ -136,45 +136,45 @@ void ClipboardData::SetTargets(ClipboardTargets aTargets) {
   mLength = aTargets.mCount;
   mData.reset(reinterpret_cast<char*>(aTargets.mTargets.release()));
 }
-
+/*
 ClipboardTargets ClipboardData::ExtractTargets() {
   GUniquePtr<GdkAtom> targets(reinterpret_cast<GdkAtom*>(mData.release()));
   uint32_t length = std::exchange(mLength, 0);
   return ClipboardTargets{std::move(targets), length};
 }
-
-GdkAtom GetSelectionAtom(int32_t aWhichClipboard) {
+*/
+int32_t GetSelectionInt(int32_t aWhichClipboard) {
   if (aWhichClipboard == nsIClipboard::kGlobalClipboard)
-    return GDK_SELECTION_CLIPBOARD;
+    return 0;
 
-  return GDK_SELECTION_PRIMARY;
+  return 1;
 }
 
 Maybe<nsIClipboard::ClipboardType> GetGeckoClipboardType(
-    GtkClipboard* aGtkClipboard) {
-  if (aGtkClipboard == gtk_clipboard_get(GDK_SELECTION_PRIMARY)) {
+    GdkClipboard* aGdkClipboard) {
+  if (aGdkClipboard == gdk_display_get_primary_clipboard(gdk_display_get_default())); {
     return Some(nsClipboard::kSelectionClipboard);
   }
-  if (aGtkClipboard == gtk_clipboard_get(GDK_SELECTION_CLIPBOARD)) {
+  if (aGdkClipboard == gdk_display_get_clipboard(gdk_display_get_default())); {
     return Some(nsClipboard::kGlobalClipboard);
   }
   return Nothing();  // THAT AIN'T NO CLIPBOARD I EVER HEARD OF
 }
 
-void nsRetrievalContext::ClearCachedTargetsClipboard(GtkClipboard* aClipboard,
+void nsRetrievalContext::ClearCachedTargetsClipboard(GdkClipboard* aClipboard,
                                                      GdkEvent* aEvent,
                                                      gpointer data) {
   MOZ_CLIPBOARD_LOG("nsRetrievalContext::ClearCachedTargetsClipboard()");
   sClipboardTargets.Clear();
 }
 
-void nsRetrievalContext::ClearCachedTargetsPrimary(GtkClipboard* aClipboard,
+void nsRetrievalContext::ClearCachedTargetsPrimary(GdkClipboard* aClipboard,
                                                    GdkEvent* aEvent,
                                                    gpointer data) {
   MOZ_CLIPBOARD_LOG("nsRetrievalContext::ClearCachedTargetsPrimary()");
   sPrimaryTargets.Clear();
 }
-
+/*
 ClipboardTargets nsRetrievalContext::GetTargets(int32_t aWhichClipboard) {
   MOZ_CLIPBOARD_LOG("nsRetrievalContext::GetTargets(%s)\n",
                     aWhichClipboard == nsClipboard::kSelectionClipboard
@@ -191,7 +191,7 @@ ClipboardTargets nsRetrievalContext::GetTargets(int32_t aWhichClipboard) {
   }
   return storedTargets.Clone();
 }
-
+*/
 nsRetrievalContext::~nsRetrievalContext() {
   sClipboardTargets.Clear();
   sPrimaryTargets.Clear();
@@ -208,19 +208,20 @@ nsClipboard::nsClipboard()
 #endif
           false /* supportsFindClipboard */,
           false /* supportsSelectionCache */)) {
-  g_signal_connect(gtk_clipboard_get(GDK_SELECTION_CLIPBOARD), "owner-change",
-                   G_CALLBACK(clipboard_owner_change_cb), this);
-  g_signal_connect(gtk_clipboard_get(GDK_SELECTION_PRIMARY), "owner-change",
-                   G_CALLBACK(clipboard_owner_change_cb), this);
+  //g_signal_connect(gtk_clipboard_get(GDK_SELECTION_CLIPBOARD), "owner-change",
+  //                 G_CALLBACK(clipboard_owner_change_cb), this);
+  //g_signal_connect(gtk_clipboard_get(GDK_SELECTION_PRIMARY), "owner-change",
+  //                 G_CALLBACK(clipboard_owner_change_cb), this);
 }
 
 nsClipboard::~nsClipboard() {
-  g_signal_handlers_disconnect_by_func(
+  /*g_signal_handlers_disconnect_by_func(
       gtk_clipboard_get(GDK_SELECTION_CLIPBOARD),
       FuncToGpointer(clipboard_owner_change_cb), this);
   g_signal_handlers_disconnect_by_func(
       gtk_clipboard_get(GDK_SELECTION_PRIMARY),
       FuncToGpointer(clipboard_owner_change_cb), this);
+  */
 }
 
 NS_IMPL_ISUPPORTS_INHERITED(nsClipboard, nsBaseClipboard, nsIObserver)
@@ -254,7 +255,7 @@ nsClipboard::Observe(nsISupports* aSubject, const char* aTopic,
   return SchedulerGroup::Dispatch(
       NS_NewRunnableFunction("gtk_clipboard_store()", []() {
         MOZ_CLIPBOARD_LOG("nsClipboard storing clipboard content\n");
-        gtk_clipboard_store(gtk_clipboard_get(GDK_SELECTION_CLIPBOARD));
+    //    gtk_clipboard_store(gtk_clipboard_get(GDK_SELECTION_CLIPBOARD));
       }));
 }
 
@@ -278,7 +279,7 @@ nsClipboard::SetNativeClipboardData(nsITransferable* aTransferable,
       aWhichClipboard == kSelectionClipboard ? "primary" : "clipboard");
 
   // List of suported targets
-  GtkTargetList* list = gtk_target_list_new(nullptr, 0);
+  //GtkTargetList* list = gtk_target_list_new(nullptr, 0);
 
   // Get the types of supported flavors
   nsTArray<nsCString> flavors;
@@ -297,7 +298,7 @@ nsClipboard::SetNativeClipboardData(nsITransferable* aTransferable,
     // Special case text/plain since we can handle all of the string types.
     if (flavorStr.EqualsLiteral(kTextMime)) {
       MOZ_CLIPBOARD_LOG("    adding TEXT targets\n");
-      gtk_target_list_add_text_targets(list, 0);
+      //gtk_target_list_add_text_targets(list, 0);
       continue;
     }
 
@@ -306,7 +307,7 @@ nsClipboard::SetNativeClipboardData(nsITransferable* aTransferable,
       if (!imagesAdded) {
         // accept any writable image type
         MOZ_CLIPBOARD_LOG("    adding IMAGE targets\n");
-        gtk_target_list_add_image_targets(list, 0, TRUE);
+        //gtk_target_list_add_image_targets(list, 0, TRUE);
         imagesAdded = true;
       }
       continue;
@@ -314,21 +315,23 @@ nsClipboard::SetNativeClipboardData(nsITransferable* aTransferable,
 
     if (flavorStr.EqualsLiteral(kFileMime)) {
       MOZ_CLIPBOARD_LOG("    adding text/uri-list target\n");
-      GdkAtom atom = gdk_atom_intern(kURIListMime, FALSE);
-      gtk_target_list_add(list, atom, 0, 0);
+      //GdkAtom atom = gdk_atom_intern(kURIListMime, FALSE);
+      //gtk_target_list_add(list, atom, 0, 0);
       continue;
     }
 
     // Add this to our list of valid targets
     MOZ_CLIPBOARD_LOG("    adding OTHER target %s\n", flavorStr.get());
-    GdkAtom atom = gdk_atom_intern(flavorStr.get(), FALSE);
-    gtk_target_list_add(list, atom, 0, 0);
+    //GdkAtom atom = gdk_atom_intern(flavorStr.get(), FALSE);
+    //gtk_target_list_add(list, atom, 0, 0);
   }
 
   // Get GTK clipboard (CLIPBOARD or PRIMARY)
-  GtkClipboard* gtkClipboard =
-      gtk_clipboard_get(GetSelectionAtom(aWhichClipboard));
-
+  //GtkClipboard* gtkClipboard =
+  //    gtk_clipboard_get(GetSelectionAtom(aWhichClipboard));
+  GdkClipboard* gdkClipboard = gdk_display_get_clipboard(gdk_display_get_default());
+  
+  /*
   gint numTargets = 0;
   GtkTargetEntry* gtkTargets =
       gtk_target_table_new_from_list(list, &numTargets);
@@ -341,10 +344,13 @@ nsClipboard::SetNativeClipboardData(nsITransferable* aTransferable,
     EmptyNativeClipboardData(aWhichClipboard);
     return NS_ERROR_FAILURE;
   }
-
+  */
   ClearCachedTargets(aWhichClipboard);
 
   // Set getcallback and request to store data after an application exit
+  gdk_clipboard_store_async(gdkClipboard, G_PRIORITY_DEFAULT,
+  nullptr, nullptr, nullptr);
+  /*
   if (gtk_clipboard_set_with_data(gtkClipboard, gtkTargets, numTargets,
                                   clipboard_get_cb, clipboard_clear_cb, this)) {
     // We managed to set-up the clipboard so update internal state
@@ -368,6 +374,7 @@ nsClipboard::SetNativeClipboardData(nsITransferable* aTransferable,
 
   gtk_target_table_free(gtkTargets, numTargets);
   gtk_target_list_unref(list);
+  */
 
   return rv;
 }
@@ -396,7 +403,7 @@ static bool IsMIMEAtFlavourList(const nsTArray<nsCString>& aFlavourList,
 bool nsClipboard::FilterImportedFlavors(int32_t aWhichClipboard,
                                         nsTArray<nsCString>& aFlavors) {
   MOZ_CLIPBOARD_LOG("nsClipboard::FilterImportedFlavors");
-
+/*
   auto targets = mContext->GetTargets(aWhichClipboard);
   if (!targets) {
     MOZ_CLIPBOARD_LOG("    X11: no targes at clipboard (null), quit.\n");
@@ -447,6 +454,7 @@ bool nsClipboard::FilterImportedFlavors(int32_t aWhichClipboard,
     MOZ_CLIPBOARD_LOG("    %s\n", aFlavors[i].get());
   }
 #endif
+*/
   return true;
 }
 
@@ -720,7 +728,7 @@ static void AsyncGetTextImpl(nsITransferable* aTransferable,
                     aWhichClipboard == nsClipboard::kSelectionClipboard
                         ? "primary"
                         : "clipboard");
-
+  /*
   gtk_clipboard_request_text(
       gtk_clipboard_get(GetSelectionAtom(aWhichClipboard)),
       [](GtkClipboard* aClipboard, const gchar* aText, gpointer aData) -> void {
@@ -745,6 +753,7 @@ static void AsyncGetTextImpl(nsITransferable* aTransferable,
         ref->mDataCallback(NS_OK);
       },
       new DataCallbackHandler(aTransferable, std::move(aCallback), kTextMime));
+  */
 }
 
 static void AsyncGetDataImpl(nsITransferable* aTransferable,
@@ -768,7 +777,7 @@ static void AsyncGetDataImpl(nsITransferable* aTransferable,
       gtkMIMEType = aMimeType;
       break;
   }
-
+  /*
   gtk_clipboard_request_contents(
       gtk_clipboard_get(GetSelectionAtom(aWhichClipboard)),
       gdk_atom_intern(gtkMIMEType, FALSE),
@@ -822,6 +831,7 @@ static void AsyncGetDataImpl(nsITransferable* aTransferable,
       },
       new DataCallbackHandler(aTransferable, std::move(aCallback), aMimeType,
                               aDataType));
+  */
 }
 
 static void AsyncGetDataFlavor(nsITransferable* aTransferable,
@@ -936,12 +946,16 @@ nsresult nsClipboard::EmptyNativeClipboardData(ClipboardType aWhichClipboard) {
       aWhichClipboard == kSelectionClipboard ? "primary" : "clipboard");
   if (aWhichClipboard == kSelectionClipboard) {
     if (mSelectionTransferable) {
-      gtk_clipboard_clear(gtk_clipboard_get(GDK_SELECTION_PRIMARY));
+      //gtk_clipboard_clear(gtk_clipboard_get(GDK_SELECTION_PRIMARY));
+      gdk_clipboard_set_content(gdk_display_get_primary_clipboard(gdk_display_get_default()),
+                                nullptr);
       MOZ_ASSERT(!mSelectionTransferable);
     }
   } else {
     if (mGlobalTransferable) {
-      gtk_clipboard_clear(gtk_clipboard_get(GDK_SELECTION_CLIPBOARD));
+      //gtk_clipboard_clear(gtk_clipboard_get(GDK_SELECTION_CLIPBOARD));
+      gdk_clipboard_set_content(gdk_display_get_clipboard(gdk_display_get_default()),
+                                nullptr);
       MOZ_ASSERT(!mGlobalTransferable);
     }
   }
@@ -958,7 +972,7 @@ void nsClipboard::ClearTransferable(int32_t aWhichClipboard) {
     mGlobalTransferable = nullptr;
   }
 }
-
+/*
 static bool FlavorMatchesTarget(const nsACString& aFlavor, GdkAtom aTarget) {
   GUniquePtr<gchar> atom_name(gdk_atom_name(aTarget));
   if (!atom_name) {
@@ -984,7 +998,7 @@ static bool FlavorMatchesTarget(const nsACString& aFlavor, GdkAtom aTarget) {
   }
   return false;
 }
-
+*/
 mozilla::Result<bool, nsresult>
 nsClipboard::HasNativeClipboardDataMatchingFlavors(
     const nsTArray<nsCString>& aFlavorList, ClipboardType aWhichClipboard) {
@@ -998,7 +1012,7 @@ nsClipboard::HasNativeClipboardDataMatchingFlavors(
   if (!mContext) {
     return Err(NS_ERROR_FAILURE);
   }
-
+/*
   auto targets = mContext->GetTargets(aWhichClipboard);
   if (!targets) {
     MOZ_CLIPBOARD_LOG("    no targes at clipboard (null)\n");
@@ -1040,7 +1054,7 @@ nsClipboard::HasNativeClipboardDataMatchingFlavors(
       }
     }
   }
-
+*/
   MOZ_CLIPBOARD_LOG("    no targes at clipboard (bad match)\n");
   return false;
 }
@@ -1068,7 +1082,7 @@ void nsClipboard::AsyncHasNativeClipboardDataMatchingFlavors(
   MOZ_CLIPBOARD_LOG(
       "nsClipboard::AsyncHasNativeClipboardDataMatchingFlavors (%s)",
       aWhichClipboard == kSelectionClipboard ? "primary" : "clipboard");
-
+/*
   gtk_clipboard_request_contents(
       gtk_clipboard_get(GetSelectionAtom(aWhichClipboard)),
       gdk_atom_intern("TARGETS", FALSE),
@@ -1119,6 +1133,7 @@ void nsClipboard::AsyncHasNativeClipboardDataMatchingFlavors(
         handler->mCallback(std::move(results));
       },
       new TragetCallbackHandler(aFlavorList, std::move(aCallback)));
+*/
 }
 
 nsITransferable* nsClipboard::GetTransferable(int32_t aWhichClipboard) {
@@ -1131,7 +1146,7 @@ nsITransferable* nsClipboard::GetTransferable(int32_t aWhichClipboard) {
 
   return retval;
 }
-
+/*
 void nsClipboard::SelectionGetEvent(GtkClipboard* aClipboard,
                                     GtkSelectionData* aSelectionData) {
   // Someone has asked us to hand them something.  The first thing
@@ -1345,11 +1360,11 @@ void nsClipboard::SelectionGetEvent(GtkClipboard* aClipboard,
   MOZ_CLIPBOARD_LOG("  Setting %s as a primitive data type, %d bytes\n",
                     target_name.get(), dataLen);
   gtk_selection_data_set(aSelectionData, selectionTarget,
-                         8, /* 8 bits in a unit */
+                         8, // 8 bits in a unit 
                          (const guchar*)primitive_data, dataLen);
   free(primitive_data);
 }
-
+*/
 void nsClipboard::ClearCachedTargets(int32_t aWhichClipboard) {
   if (aWhichClipboard == kSelectionClipboard) {
     nsRetrievalContext::ClearCachedTargetsPrimary(nullptr, nullptr, nullptr);
@@ -1358,8 +1373,8 @@ void nsClipboard::ClearCachedTargets(int32_t aWhichClipboard) {
   }
 }
 
-void nsClipboard::SelectionClearEvent(GtkClipboard* aGtkClipboard) {
-  Maybe<ClipboardType> whichClipboard = GetGeckoClipboardType(aGtkClipboard);
+void nsClipboard::SelectionClearEvent(GdkClipboard* aGdkClipboard) {
+  Maybe<ClipboardType> whichClipboard = GetGeckoClipboardType(aGdkClipboard);
   if (whichClipboard.isNothing()) {
     return;
   }
@@ -1370,7 +1385,7 @@ void nsClipboard::SelectionClearEvent(GtkClipboard* aGtkClipboard) {
   ClearTransferable(*whichClipboard);
   ClearClipboardCache(*whichClipboard);
 }
-
+/*
 void nsClipboard::OwnerChangedEvent(GtkClipboard* aGtkClipboard,
                                     GdkEventOwnerChange* aEvent) {
   Maybe<ClipboardType> whichClipboard = GetGeckoClipboardType(aGtkClipboard);
@@ -1401,7 +1416,8 @@ void nsClipboard::OwnerChangedEvent(GtkClipboard* aGtkClipboard,
 
   ClearCachedTargets(*whichClipboard);
 }
-
+*/
+/*
 void clipboard_get_cb(GtkClipboard* aGtkClipboard,
                       GtkSelectionData* aSelectionData, guint info,
                       gpointer user_data) {
@@ -1423,7 +1439,7 @@ void clipboard_owner_change_cb(GtkClipboard* aGtkClipboard,
   nsClipboard* clipboard = static_cast<nsClipboard*>(aUserData);
   clipboard->OwnerChangedEvent(aGtkClipboard, aEvent);
 }
-
+*/
 /*
  * This function extracts the encoding label from the subset of HTML internal
  * encoding declaration syntax that uses the old long form with double quotes
