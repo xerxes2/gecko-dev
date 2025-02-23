@@ -18,7 +18,7 @@ class nsRetrievalContextWayland final : public nsRetrievalContext {
   ClipboardData GetClipboardData(const char* aMimeType,
                                  int32_t aWhichClipboard) override;
   mozilla::GUniquePtr<char> GetClipboardText(int32_t aWhichClipboard) override;
-  ClipboardTargets GetTargetsImpl(int32_t aWhichClipboard) override;
+  //ClipboardTargets GetTargetsImpl(int32_t aWhichClipboard) override;
 
  private:
   ClipboardData WaitForClipboardData(ClipboardDataType, int32_t aWhichClipboard,
