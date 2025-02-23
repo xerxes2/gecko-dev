@@ -2751,7 +2751,7 @@ bool ContentParent::InitInternal(ProcessPriority aInitialPriority) {
 
   L10nRegistry::GetParentProcessFileSourceDescriptors(
       xpcomInit.l10nFileSources());
-/*
+
   nsCOMPtr<nsIClipboard> clipboard(
       do_GetService("@mozilla.org/widget/clipboard;1"));
   MOZ_ASSERT(clipboard, "No clipboard?");
@@ -2767,7 +2767,7 @@ bool ContentParent::InitInternal(ProcessPriority aInitialPriority) {
 
   xpcomInit.clipboardCaps().supportsSelectionCache() =
       clipboard->IsClipboardTypeSupported(nsIClipboard::kSelectionCache);
-*/
+
   // Let's copy the domain policy from the parent to the child (if it's active).
   StructuredCloneData initialData;
   nsIScriptSecurityManager* ssm = nsContentUtils::GetSecurityManager();
