@@ -19,7 +19,7 @@
 using namespace mozilla;
 
 nsRetrievalContextWayland::nsRetrievalContextWayland() = default;
-
+/*
 ClipboardTargets nsRetrievalContextWayland::GetTargetsImpl(
     int32_t aWhichClipboard) {
   MOZ_CLIPBOARD_LOG("nsRetrievalContextWayland::GetTargetsImpl()\n");
@@ -27,7 +27,7 @@ ClipboardTargets nsRetrievalContextWayland::GetTargetsImpl(
   return WaitForClipboardData(ClipboardDataType::Targets, aWhichClipboard)
       .ExtractTargets();
 }
-
+*/
 ClipboardData nsRetrievalContextWayland::GetClipboardData(
     const char* aMimeType, int32_t aWhichClipboard) {
   MOZ_CLIPBOARD_LOG("nsRetrievalContextWayland::GetClipboardData() mime %s\n",
@@ -39,11 +39,11 @@ ClipboardData nsRetrievalContextWayland::GetClipboardData(
 
 GUniquePtr<char> nsRetrievalContextWayland::GetClipboardText(
     int32_t aWhichClipboard) {
-  GdkAtom selection = GetSelectionAtom(aWhichClipboard);
+  //GdkAtom selection = GetSelectionAtom(aWhichClipboard);
 
   MOZ_CLIPBOARD_LOG(
       "nsRetrievalContextWayland::GetClipboardText(), clipboard %s\n",
-      (selection == GDK_SELECTION_PRIMARY) ? "Primary" : "Selection");
+      (aWhichClipboard) ? "Primary" : "Selection");
 
   return WaitForClipboardData(ClipboardDataType::Text, aWhichClipboard)
       .ExtractText();
@@ -57,6 +57,7 @@ ClipboardData nsRetrievalContextWayland::WaitForClipboardData(
 
   AsyncGtkClipboardRequest request(aDataType, aWhichClipboard, aMimeType);
   int iteration = 1;
+  GMainContext* mainContext = g_main_context_get_thread_default();
 
   PRTime entryTime = PR_Now();
   while (!request.HasCompleted()) {
@@ -71,8 +72,10 @@ ClipboardData nsRetrievalContextWayland::WaitForClipboardData(
     }
     MOZ_CLIPBOARD_LOG("doing iteration %d msec %ld ...\n", (iteration - 1),
                       (long)((PR_Now() - entryTime) / 1000));
-    gtk_main_iteration();
+    //gtk_main_iteration();
+    g_main_context_iteration(mainContext, true);
   }
 
+  g_main_context_unref(mainContext);
   return request.TakeResult();
 }
