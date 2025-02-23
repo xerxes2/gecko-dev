@@ -21,12 +21,14 @@
 class ClipboardTargets {
   friend class ClipboardData;
 
-  mozilla::GUniquePtr<GdkAtom> mTargets;
+  //GUniquePtr<GdkAtom> mTargets;
+  mozilla::GUniquePtr<char> mTargets;
   uint32_t mCount = 0;
 
  public:
   ClipboardTargets() = default;
-  ClipboardTargets(mozilla::GUniquePtr<GdkAtom> aTargets, uint32_t aCount)
+  //ClipboardTargets(mozilla::GUniquePtr<GdkAtom> aTargets, uint32_t aCount)
+  ClipboardTargets(mozilla::GUniquePtr<char> aTargets, uint32_t aCount)
       : mTargets(std::move(aTargets)), mCount(aCount) {}
 
   void Set(ClipboardTargets);
@@ -36,7 +38,7 @@ class ClipboardTargets {
     mCount = 0;
   };
 
-  mozilla::Span<GdkAtom> AsSpan() const { return {mTargets.get(), mCount}; }
+  mozilla::Span<char> AsSpan() const { return {mTargets.get(), mCount}; }
   explicit operator bool() const { return bool(mTargets); }
 };
 
@@ -79,15 +81,15 @@ class nsRetrievalContext {
   ClipboardTargets GetTargets(int32_t aWhichClipboard);
 
   // Clipboard/Primary selection owner changed. Clear internal cached data.
-  static void ClearCachedTargetsClipboard(GtkClipboard* aClipboard,
+  static void ClearCachedTargetsClipboard(GdkClipboard* aClipboard,
                                           GdkEvent* aEvent, gpointer data);
-  static void ClearCachedTargetsPrimary(GtkClipboard* aClipboard,
+  static void ClearCachedTargetsPrimary(GdkClipboard* aClipboard,
                                         GdkEvent* aEvent, gpointer data);
 
   nsRetrievalContext() = default;
 
  protected:
-  virtual ClipboardTargets GetTargetsImpl(int32_t aWhichClipboard) = 0;
+  //virtual ClipboardTargets GetTargetsImpl(int32_t aWhichClipboard) = 0;
   virtual ~nsRetrievalContext();
 
   static ClipboardTargets sClipboardTargets;
@@ -106,13 +108,13 @@ class nsClipboard : public nsBaseClipboard, public nsIObserver {
   nsresult Init(void);
 
   // Someone requested the selection
-  void SelectionGetEvent(GtkClipboard* aGtkClipboard,
-                         GtkSelectionData* aSelectionData);
-  void SelectionClearEvent(GtkClipboard* aGtkClipboard);
+  void SelectionGetEvent(GdkClipboard* aGdkClipboard,
+                         GdkContentProvider** aContentProvider);
+  void SelectionClearEvent(GdkClipboard* aGdkClipboard);
 
   // Clipboard owner changed
-  void OwnerChangedEvent(GtkClipboard* aGtkClipboard,
-                         GdkEventOwnerChange* aEvent);
+  //void OwnerChangedEvent(GdkClipboard* aGdkClipboard,
+  //                       GdkEventOwnerChange* aEvent);
 
   mozilla::Result<int32_t, nsresult> GetNativeClipboardSequenceNumber(
       ClipboardType aWhichClipboard) override;
@@ -160,8 +162,8 @@ class nsClipboard : public nsBaseClipboard, public nsIObserver {
 extern const int kClipboardTimeout;
 extern const int kClipboardFastIterationNum;
 
-GdkAtom GetSelectionAtom(int32_t aWhichClipboard);
+int32_t GetSelectionInt(int32_t aWhichClipboard);
 mozilla::Maybe<nsIClipboard::ClipboardType> GetGeckoClipboardType(
-    GtkClipboard* aGtkClipboard);
+    GdkClipboard* aGdkClipboard);
 
 #endif /* __nsClipboard_h_ */
