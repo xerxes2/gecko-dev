@@ -375,7 +375,7 @@ bool NativeKeyBindings::GetEditCommandsInternal(
     const WidgetKeyboardEvent& aEvent, nsTArray<CommandInt>& aCommands,
     guint aKeyval) {
   //guint modifiers = static_cast<GdkEventKey*>(aEvent.mNativeKeyEvent)->state;
-  guint modifiers = gdk_event_get_modifier_state(GDK_EVENT(static_cast<GdkKeyEvent*>(aEvent.mNativeKeyEvent)));
+  //guint modifiers = gdk_event_get_modifier_state(GDK_EVENT(static_cast<GdkKeyEvent*>(aEvent.mNativeKeyEvent)));
   guint keyval = gdk_key_event_get_keyval(GDK_EVENT(static_cast<GdkKeyEvent*>(aEvent.mNativeKeyEvent)));
 
   gCurrentCommands = &aCommands;
@@ -383,13 +383,28 @@ bool NativeKeyBindings::GetEditCommandsInternal(
   gHandled = false;
   //gtk_bindings_activate(G_OBJECT(mNativeTarget), aKeyval,
   //  GdkModifierType(modifiers));
+  GdkKeyMatch match;
 
   switch (keyval) {
-    case 99:
-      GdkKeyMatch match = gdk_key_event_matches(GDK_EVENT(static_cast<GdkKeyEvent*>(aEvent.mNativeKeyEvent)),
+    case GDK_KEY_c:
+      match = gdk_key_event_matches(GDK_EVENT(static_cast<GdkKeyEvent*>(aEvent.mNativeKeyEvent)),
                                                           keyval, GdkModifierType(GDK_CONTROL_MASK));
       if (match == GDK_KEY_MATCH_EXACT) {
         aSignal = "copy-clipboard";
+      }
+      break;
+    case GDK_KEY_x:
+      match = gdk_key_event_matches(GDK_EVENT(static_cast<GdkKeyEvent*>(aEvent.mNativeKeyEvent)),
+                                                          keyval, GdkModifierType(GDK_CONTROL_MASK));
+      if (match == GDK_KEY_MATCH_EXACT) {
+        aSignal = "cut-clipboard";
+      }
+      break;
+    case GDK_KEY_v:
+      match = gdk_key_event_matches(GDK_EVENT(static_cast<GdkKeyEvent*>(aEvent.mNativeKeyEvent)),
+                                                          keyval, GdkModifierType(GDK_CONTROL_MASK));
+      if (match == GDK_KEY_MATCH_EXACT) {
+        aSignal = "paste-clipboard";
       }
       break;
   }
