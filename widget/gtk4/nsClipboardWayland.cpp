@@ -57,7 +57,7 @@ ClipboardData nsRetrievalContextWayland::WaitForClipboardData(
 
   AsyncGtkClipboardRequest request(aDataType, aWhichClipboard, aMimeType);
   int iteration = 1;
-  GMainContext* mainContext = g_main_context_get_thread_default();
+  GMainContext* mainContext = g_main_context_ref_thread_default();
 
   PRTime entryTime = PR_Now();
   while (!request.HasCompleted()) {
