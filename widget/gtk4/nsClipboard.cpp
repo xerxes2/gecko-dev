@@ -291,6 +291,7 @@ nsClipboard::SetNativeClipboardData(nsITransferable* aTransferable,
 
   // Add all the flavors to this widget's supported type.
   bool imagesAdded = false;
+  bool textAdded = false;
   for (uint32_t i = 0; i < flavors.Length(); i++) {
     nsCString& flavorStr = flavors[i];
     MOZ_CLIPBOARD_LOG("    processing target %s\n", flavorStr.get());
@@ -299,6 +300,7 @@ nsClipboard::SetNativeClipboardData(nsITransferable* aTransferable,
     if (flavorStr.EqualsLiteral(kTextMime)) {
       MOZ_CLIPBOARD_LOG("    adding TEXT targets\n");
       //gtk_target_list_add_text_targets(list, 0);
+      textAdded = true;
       continue;
     }
 
@@ -326,11 +328,51 @@ nsClipboard::SetNativeClipboardData(nsITransferable* aTransferable,
     //gtk_target_list_add(list, atom, 0, 0);
   }
 
-  // Get GTK clipboard (CLIPBOARD or PRIMARY)
-  //GtkClipboard* gtkClipboard =
-  //    gtk_clipboard_get(GetSelectionAtom(aWhichClipboard));
-  GdkClipboard* gdkClipboard = gdk_display_get_clipboard(gdk_display_get_default());
+  // Get GDK clipboard (CLIPBOARD or PRIMARY)
+  GdkClipboard* aClipboard = nullptr;
+  if (GetSelectionInt(aWhichClipboard)) {
+    aClipboard = gdk_display_get_primary_clipboard(gdk_display_get_default());
+  } else {
+    aClipboard = gdk_display_get_clipboard(gdk_display_get_default());
+  }
   
+  if (!aTransferable) {
+    // We have nothing to serve
+    MOZ_CLIPBOARD_LOG(
+        "nsClipboard::SelectionGetEvent() - %s clipboard is empty!\n",
+        aWhichClipboard == kSelectionClipboard ? "Primary" : "Clipboard");
+
+    return NS_OK;
+  }
+
+  nsCOMPtr<nsISupports> item;
+
+  // Check to see if the selection data is some text type.
+  if (textAdded) {
+    MOZ_CLIPBOARD_LOG("  providing text/plain data\n");
+
+    // Try to convert our internal type into a text string.  Get
+    // the transferable for this clipboard and try to get the
+    // text/plain type for it.
+    rv = aTransferable->GetTransferData("text/plain", getter_AddRefs(item));
+    if (NS_FAILED(rv) || !item) {
+      MOZ_CLIPBOARD_LOG("  GetTransferData() failed to get text/plain!\n");
+
+      return NS_ERROR_FAILURE;
+    }
+
+    nsCOMPtr<nsISupportsString> wideString;
+    wideString = do_QueryInterface(item);
+    if (!wideString) return NS_ERROR_FAILURE;
+
+    nsAutoString ucs2string;
+    wideString->GetData(ucs2string);
+    NS_ConvertUTF16toUTF8 utf8string(ucs2string);
+
+    MOZ_CLIPBOARD_LOG("  sent %zd bytes of utf-8 data\n", utf8string.Length());
+    gdk_clipboard_set_text(aClipboard, utf8string.get());
+    return NS_OK;
+  }
   /*
   gint numTargets = 0;
   GtkTargetEntry* gtkTargets =
@@ -345,12 +387,9 @@ nsClipboard::SetNativeClipboardData(nsITransferable* aTransferable,
     return NS_ERROR_FAILURE;
   }
   */
-  ClearCachedTargets(aWhichClipboard);
-
-  // Set getcallback and request to store data after an application exit
-  gdk_clipboard_store_async(gdkClipboard, G_PRIORITY_DEFAULT,
-  nullptr, nullptr, nullptr);
+  //ClearCachedTargets(aWhichClipboard);
   /*
+  // Set getcallback and request to store data after an application exit
   if (gtk_clipboard_set_with_data(gtkClipboard, gtkTargets, numTargets,
                                   clipboard_get_cb, clipboard_clear_cb, this)) {
     // We managed to set-up the clipboard so update internal state
@@ -837,6 +876,7 @@ static void AsyncGetDataImpl(nsITransferable* aTransferable,
 static void AsyncGetDataFlavor(nsITransferable* aTransferable,
                                int32_t aWhichClipboard, nsCString& aFlavorStr,
                                nsBaseClipboard::GetDataCallback&& aCallback) {
+
   if (aFlavorStr.EqualsLiteral(kJPEGImageMime) ||
       aFlavorStr.EqualsLiteral(kJPGImageMime) ||
       aFlavorStr.EqualsLiteral(kPNGImageMime) ||
@@ -886,6 +926,7 @@ void nsClipboard::AsyncGetNativeClipboardData(nsITransferable* aTransferable,
                     aWhichClipboard == nsClipboard::kSelectionClipboard
                         ? "primary"
                         : "clipboard");
+
   nsTArray<nsCString> importedFlavors;
   nsresult rv = GetTransferableFlavors(aTransferable, importedFlavors);
   if (NS_FAILED(rv)) {
@@ -1012,49 +1053,23 @@ nsClipboard::HasNativeClipboardDataMatchingFlavors(
   if (!mContext) {
     return Err(NS_ERROR_FAILURE);
   }
-/*
-  auto targets = mContext->GetTargets(aWhichClipboard);
-  if (!targets) {
-    MOZ_CLIPBOARD_LOG("    no targes at clipboard (null)\n");
-    return false;
-  }
-
-#ifdef MOZ_LOGGING
-  if (MOZ_CLIPBOARD_LOG_ENABLED()) {
-    MOZ_CLIPBOARD_LOG("    Asking for content:\n");
-    for (auto& flavor : aFlavorList) {
-      MOZ_CLIPBOARD_LOG("        MIME %s\n", flavor.get());
-    }
-    MOZ_CLIPBOARD_LOG("    Clipboard content (target nums %zu):\n",
-                      targets.AsSpan().Length());
-    for (const auto& target : targets.AsSpan()) {
-      GUniquePtr<gchar> atom_name(gdk_atom_name(target));
-      if (!atom_name) {
-        MOZ_CLIPBOARD_LOG("        failed to get MIME\n");
-        continue;
-      }
-      MOZ_CLIPBOARD_LOG("        MIME %s\n", atom_name.get());
-    }
-  }
-#endif
 
   // Walk through the provided types and try to match it to a
   // provided type.
+  GdkClipboard* clipboard = nullptr;
+  if (GetSelectionInt(aWhichClipboard)) {
+    clipboard = gdk_display_get_primary_clipboard(gdk_display_get_default());
+  } else {
+    clipboard = gdk_display_get_clipboard(gdk_display_get_default());
+  }
+  GdkContentFormats* formats = gdk_clipboard_get_formats(clipboard);
+
   for (auto& flavor : aFlavorList) {
-    // We special case text/plain here.
-    if (flavor.EqualsLiteral(kTextMime) &&
-        gtk_targets_include_text(targets.AsSpan().data(),
-                                 targets.AsSpan().Length())) {
-      MOZ_CLIPBOARD_LOG("    has kTextMime\n");
+    if (gdk_content_formats_contain_mime_type(formats, flavor.get())) {
       return true;
     }
-    for (const auto& target : targets.AsSpan()) {
-      if (FlavorMatchesTarget(flavor, target)) {
-        return true;
-      }
-    }
   }
-*/
+
   MOZ_CLIPBOARD_LOG("    no targes at clipboard (bad match)\n");
   return false;
 }
@@ -1082,6 +1097,7 @@ void nsClipboard::AsyncHasNativeClipboardDataMatchingFlavors(
   MOZ_CLIPBOARD_LOG(
       "nsClipboard::AsyncHasNativeClipboardDataMatchingFlavors (%s)",
       aWhichClipboard == kSelectionClipboard ? "primary" : "clipboard");
+
 /*
   gtk_clipboard_request_contents(
       gtk_clipboard_get(GetSelectionAtom(aWhichClipboard)),
