@@ -6355,6 +6355,7 @@ nsresult nsWindow::Create(nsIWidget* aParent, const LayoutDeviceIntRect& aRect,
   // Button
   GtkGesture* gesture_click = gtk_gesture_click_new();
   gtk_widget_add_controller(mShell, GTK_EVENT_CONTROLLER(gesture_click));
+  gtk_gesture_single_set_button(GTK_GESTURE_SINGLE(gesture_click), 0);
   g_signal_connect(gesture_click, "pressed",
                    G_CALLBACK(button_press_event_cb), nullptr);
   g_signal_connect(gesture_click, "released",
